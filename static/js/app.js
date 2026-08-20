@@ -1223,10 +1223,12 @@ function hideAllViews() {
     const v2 = document.getElementById('closedShiftView');
     const v3 = document.getElementById('historyView');
     const v4 = document.getElementById('financialDashboardView');
+    const v5 = document.getElementById('settingsView');
     if (v1) v1.style.display = 'none';
     if (v2) v2.style.display = 'none';
     if (v3) v3.style.display = 'none';
     if (v4) v4.style.display = 'none';
+    if (v5) v5.style.display = 'none';
 }
 
 function handleClosedStartNew() {
@@ -2600,6 +2602,20 @@ function closeModal(id) { document.getElementById(id).classList.remove('show'); 
 let settingsData = {employees:[], inventory_items:[], packages:[]};
 let _settingsSnapshot = null;
 
+async function showSettingsView() {
+    if (!isAdminLoggedIn()) {
+        const authed = await requireAdminAuth();
+        if (!authed) return;
+    }
+    hideAllViews();
+    const sView = document.getElementById('settingsView');
+    if (sView) sView.style.display = 'block';
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('navSettingsBtn');
+    if (btn) btn.classList.add('active');
+    await openSettings();
+}
+
 async function openSettings() {
     try {
         const res = await fetch('/api/settings', { headers: { ..._authHeaders() } });
@@ -2608,12 +2624,11 @@ async function openSettings() {
         if (settingsData.packages) settingsData.packages = sortPackages(settingsData.packages);
         _settingsSnapshot = JSON.parse(JSON.stringify(settingsData));
         renderSettings();
-        openModal('settingsModal');
     } catch(e) { showToast('Failed to load settings','error'); }
 }
 
 function closeSettings() {
-    closeModal('settingsModal');
+    showFormView();
 }
 
 function _requiresAdminPin() {
@@ -2673,6 +2688,8 @@ async function logoutAdmin() {
     _clearAdminSession();
     showToast('Admin session locked', 'info');
     if (document.getElementById('financialDashboardView') && document.getElementById('financialDashboardView').style.display !== 'none') {
+        showFormView();
+    } else if (document.getElementById('settingsView') && document.getElementById('settingsView').style.display !== 'none') {
         showFormView();
     } else if (document.getElementById('historyView') && document.getElementById('historyView').style.display !== 'none') {
         refreshHistory();
@@ -3295,7 +3312,7 @@ async function saveSettings() {
                 renderInventory(config.inventory_items);
             }
             showToast('Settings saved!','success');
-            closeModal('settingsModal');
+            _settingsSnapshot = JSON.parse(JSON.stringify(settingsData));
         } else { showToast('Failed to save settings','error'); }
     } catch(e) { showToast('Error saving settings','error'); }
 }

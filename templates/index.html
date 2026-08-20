@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20">
+    <link rel="stylesheet" href="/static/css/style.css?v=21">
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js" as="script">
     <script src="/static/js/chart.umd.min.js"></script>
 </head>
@@ -22,7 +22,7 @@
                 <button class="nav-btn" onclick="showFormView()" id="navFormBtn">Shift Form</button>
                 <button class="nav-btn" onclick="showHistoryView()" id="navHistoryBtn">📜 Shift History</button>
                 <button class="nav-btn" onclick="showFinancialsView()" id="navFinancialsBtn">📊 Financials</button>
-                <button class="nav-btn" onclick="openSettings()">⚙ Settings</button>
+                <button class="nav-btn" onclick="showSettingsView()" id="navSettingsBtn">⚙ Settings</button>
                 <button class="nav-btn" onclick="toggleTimerDashboard()">⏱ Timer</button>
             </nav>
             <div class="header-status">
@@ -609,6 +609,168 @@
         </div>
 
 
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- VIEW 5: Settings Page                           -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <div id="settingsView" style="display:none;">
+            <!-- Settings Header Card -->
+            <section class="card section-full fin-header-card">
+                <div class="fin-header-top">
+                    <div>
+                        <h1 class="fin-title"><span class="accent-gold">⚙</span> System Settings & Configuration</h1>
+                        <p class="fin-subtitle">Manage gaming packages, staff PINs, cafeteria inventory, PS5 lounge rates, and system diagnostics</p>
+                    </div>
+                    <div class="fin-header-actions">
+                        <button class="btn btn-ghost" onclick="showFormView()">✕ Back to Form</button>
+                        <button class="btn btn-secondary" onclick="openSettings()">↺ Reset</button>
+                        <button class="btn btn-primary" onclick="saveSettings()">💾 Save Changes</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Panels Grid -->
+            <div class="settings-page-grid">
+
+                <!-- 1. Packages Panel -->
+                <section class="card settings-panel">
+                    <div class="settings-panel-header">
+                        <div class="settings-panel-icon">📦</div>
+                        <div class="settings-panel-heading">
+                            <h3>PC Packages</h3>
+                            <p class="settings-panel-desc">Define Hz, hours, and price for each package tier</p>
+                        </div>
+                    </div>
+                    <div class="settings-list" id="settingsPackages"></div>
+                    <div class="settings-add-row">
+                        <div class="input-unit-group">
+                            <input type="number" class="input-glow" id="newPackageHzInput" placeholder="180" min="1">
+                            <span class="input-unit">Hz</span>
+                        </div>
+                        <div class="input-unit-group">
+                            <input type="number" class="input-glow" id="newPackageHrsInput" placeholder="6" min="1">
+                            <span class="input-unit">hrs</span>
+                        </div>
+                        <input type="number" class="input-glow" id="newPackagePriceInput" placeholder="Price" min="0" style="min-width:80px;">
+                        <button class="btn btn-sm btn-secondary" onclick="addPackage()">+ Add</button>
+                    </div>
+                </section>
+
+                <!-- 2. Employees Panel -->
+                <section class="card settings-panel">
+                    <div class="settings-panel-header">
+                        <div class="settings-panel-icon">👥</div>
+                        <div class="settings-panel-heading">
+                            <h3>Employees & Staff</h3>
+                            <p class="settings-panel-desc">Manage staff names and security PIN codes</p>
+                        </div>
+                    </div>
+                    <div class="settings-list" id="settingsEmployees"></div>
+                    <div class="settings-add-row">
+                        <input type="text" class="input-glow" id="newEmployeeInput" placeholder="Employee name" style="min-width:100px;">
+                        <button class="btn btn-sm btn-secondary" onclick="addEmployee()">+ Add</button>
+                    </div>
+                </section>
+
+                <!-- 3. Cafeteria Inventory Panel -->
+                <section class="card settings-panel">
+                    <div class="settings-panel-header">
+                        <div class="settings-panel-icon">🥤</div>
+                        <div class="settings-panel-heading">
+                            <h3>Cafeteria Items</h3>
+                            <p class="settings-panel-desc">Items removed stay visible in active shifts</p>
+                        </div>
+                    </div>
+                    <div class="settings-list" id="settingsItems"></div>
+                    <div class="settings-add-row">
+                        <input type="text" class="input-glow" id="newItemInput" placeholder="Item name" style="min-width:100px;">
+                        <button class="btn btn-sm btn-secondary" onclick="addInventoryItem()">+ Add</button>
+                    </div>
+                </section>
+
+                <!-- 4. PS5 Pricing Panel -->
+                <section class="card settings-panel">
+                    <div class="settings-panel-header">
+                        <div class="settings-panel-icon">🎮</div>
+                        <div class="settings-panel-heading">
+                            <h3>PS5 Pricing Rates</h3>
+                            <p class="settings-panel-desc">Set prices for first hour and extended hours per controller count</p>
+                        </div>
+                    </div>
+                    <div class="ps5-pricing-grid">
+                        <div class="ps5-pricing-field">
+                            <label>2 Controllers — First Hour</label>
+                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PriceTwoFirst" min="0" step="1"></div>
+                        </div>
+                        <div class="ps5-pricing-field">
+                            <label>1 Controller — First Hour</label>
+                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PriceOneFirst" min="0" step="1"></div>
+                        </div>
+                        <div class="ps5-pricing-field">
+                            <label>2 Controllers — Extended/Hour</label>
+                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PriceTwoExt" min="0" step="1"></div>
+                        </div>
+                        <div class="ps5-pricing-field">
+                            <label>1 Controller — Extended/Hour</label>
+                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PriceOneExt" min="0" step="1"></div>
+                        </div>
+                        <div class="ps5-pricing-field">
+                            <label>PC — Per Controller / Hour</label>
+                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PricePcRate" min="0" step="1"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 5. PS5 Numbers Panel -->
+                <section class="card settings-panel">
+                    <div class="settings-panel-header">
+                        <div class="settings-panel-icon">🎮</div>
+                        <div class="settings-panel-heading">
+                            <h3>PS5 / PC Numbers</h3>
+                            <p class="settings-panel-desc">Manage available PS5 and PC lounge identifier tags</p>
+                        </div>
+                    </div>
+                    <div class="settings-list" id="settingsPS5Numbers"></div>
+                    <div class="settings-add-row">
+                        <input type="text" class="input-glow" id="newPS5NumberInput" placeholder="e.g. Left, Right, PC" style="min-width:100px;">
+                        <button class="btn btn-sm btn-secondary" onclick="addPS5Number()">+ Add</button>
+                    </div>
+                </section>
+
+                <!-- 6. PC Configuration Panel -->
+                <section class="card settings-panel">
+                    <div class="settings-panel-header">
+                        <div class="settings-panel-icon">💻</div>
+                        <div class="settings-panel-heading">
+                            <h3>PC Capacity Configuration</h3>
+                            <p class="settings-panel-desc">Set the total number of gaming PCs available for package tracking</p>
+                        </div>
+                    </div>
+                    <div style="padding:16px 20px;">
+                        <label style="display:block;margin-bottom:8px;font-size:13px;color:var(--text-dim);">Total PCs Available</label>
+                        <input type="number" id="settingsTotalPCs" class="input-glow" min="1" max="500" value="27" style="width:140px;font-size:15px;font-weight:600;">
+                    </div>
+                </section>
+
+                <!-- 7. Shift Access Audit Logs Panel (Admin Only) -->
+                <section class="card settings-panel" id="auditLogsSection" style="display:none;grid-column:1/-1;">
+                    <div class="settings-panel-header" style="justify-content:space-between;align-items:center;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div class="settings-panel-icon">📋</div>
+                            <div class="settings-panel-heading">
+                                <h3>Shift Access Audit Logs</h3>
+                                <p class="settings-panel-desc">Record of staff members who unlocked and viewed closed shift details</p>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-ghost" onclick="loadAuditLogs()" style="font-size:11px;padding:4px 10px;">🔄 Refresh Logs</button>
+                    </div>
+                    <div class="audit-logs-container" id="auditLogsContainer" style="padding:12px 16px;max-height:320px;overflow-y:auto;">
+                        <div style="text-align:center;color:var(--text-dim);font-size:12px;padding:16px;">Loading access logs...</div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+
     </main>
 
     <div class="toast-container" id="toastContainer"></div>
@@ -775,161 +937,7 @@
         </div>
     </div>
 
-    <!-- Settings Modal -->
-    <div class="modal-overlay" id="settingsModal">
-        <div class="modal modal-lg">
-            <div class="modal-header">
-                <h2>⚙ Settings</h2>
-                <p>Manage employees, pricing packages, and inventory items</p>
-            </div>
-            <div class="modal-body">
-                <div class="settings-grid">
 
-                    <!-- Packages Panel -->
-                    <div class="settings-panel">
-                        <div class="settings-panel-header">
-                            <div class="settings-panel-icon">📦</div>
-                            <div class="settings-panel-heading">
-                                <h3>Packages</h3>
-                                <p class="settings-panel-desc">Define Hz, hours, and price for each package tier</p>
-                            </div>
-                        </div>
-                        <div class="settings-list" id="settingsPackages"></div>
-                        <div class="settings-add-row">
-                            <div class="input-unit-group">
-                                <input type="number" class="input-glow" id="newPackageHzInput" placeholder="180" min="1">
-                                <span class="input-unit">Hz</span>
-                            </div>
-                            <div class="input-unit-group">
-                                <input type="number" class="input-glow" id="newPackageHrsInput" placeholder="6" min="1">
-                                <span class="input-unit">hrs</span>
-                            </div>
-                            <input type="number" class="input-glow" id="newPackagePriceInput" placeholder="Price" min="0" style="min-width:80px;">
-                            <button class="btn btn-sm btn-secondary" onclick="addPackage()">+ Add</button>
-                        </div>
-                    </div>
-
-                    <!-- Employees Panel -->
-                    <div class="settings-panel">
-                        <div class="settings-panel-header">
-                            <div class="settings-panel-icon">👥</div>
-                            <div class="settings-panel-heading">
-                                <h3>Employees</h3>
-                                <p class="settings-panel-desc">Manage staff names and PIN codes</p>
-                            </div>
-                        </div>
-                        <div class="settings-list" id="settingsEmployees"></div>
-                        <div class="settings-add-row">
-                            <input type="text" class="input-glow" id="newEmployeeInput" placeholder="Employee name" style="min-width:100px;">
-                            <button class="btn btn-sm btn-secondary" onclick="addEmployee()">+ Add</button>
-                        </div>
-                    </div>
-
-                    <!-- Inventory Panel -->
-                    <div class="settings-panel">
-                        <div class="settings-panel-header">
-                            <div class="settings-panel-icon">🥤</div>
-                            <div class="settings-panel-heading">
-                                <h3>Cafeteria Items</h3>
-                                <p class="settings-panel-desc">Items removed stay visible in active shifts</p>
-                            </div>
-                        </div>
-                        <div class="settings-list" id="settingsItems"></div>
-                        <div class="settings-add-row">
-                            <input type="text" class="input-glow" id="newItemInput" placeholder="Item name" style="min-width:100px;">
-                            <button class="btn btn-sm btn-secondary" onclick="addInventoryItem()">+ Add</button>
-                        </div>
-                    </div>
-
-                    <!-- PS5 Pricing Panel -->
-                    <div class="settings-panel">
-                        <div class="settings-panel-header">
-                            <div class="settings-panel-icon">🎮</div>
-                            <div class="settings-panel-heading">
-                                <h3>PS5 Pricing</h3>
-                                <p class="settings-panel-desc">Set prices for first hour and extended hours per controller count</p>
-                            </div>
-                        </div>
-                        <div class="ps5-pricing-grid">
-                            <div class="ps5-pricing-field">
-                                <label>2 Controllers — First Hour</label>
-                                <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PriceTwoFirst" min="0" step="1"></div>
-                            </div>
-                            <div class="ps5-pricing-field">
-                                <label>1 Controller — First Hour</label>
-                                <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PriceOneFirst" min="0" step="1"></div>
-                            </div>
-                            <div class="ps5-pricing-field">
-                                <label>2 Controllers — Extended/Hour</label>
-                                <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PriceTwoExt" min="0" step="1"></div>
-                            </div>
-                            <div class="ps5-pricing-field">
-                                <label>1 Controller — Extended/Hour</label>
-                                <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PriceOneExt" min="0" step="1"></div>
-                            </div>
-                            <div class="ps5-pricing-field">
-                                <label>PC — Per Controller / Hour</label>
-                                <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PricePcRate" min="0" step="1"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- PS5 Numbers Panel -->
-                    <div class="settings-panel">
-                        <div class="settings-panel-header">
-                            <div class="settings-panel-icon">🎮</div>
-                            <div class="settings-panel-heading">
-                                <h3>PS5 / PC Numbers</h3>
-                                <p class="settings-panel-desc">Manage available PS5 and PC number options</p>
-                            </div>
-                        </div>
-                        <div class="settings-list" id="settingsPS5Numbers"></div>
-                        <div class="settings-add-row">
-                            <input type="text" class="input-glow" id="newPS5NumberInput" placeholder="e.g. Left, Right, PC" style="min-width:100px;">
-                            <button class="btn btn-sm btn-secondary" onclick="addPS5Number()">+ Add</button>
-                        </div>
-                    </div>
-
-                    <!-- PC Configuration Panel -->
-                    <div class="settings-panel">
-                        <div class="settings-panel-header">
-                            <div class="settings-panel-icon">💻</div>
-                            <div class="settings-panel-heading">
-                                <h3>PC Configuration</h3>
-                                <p class="settings-panel-desc">Set the total number of PCs available for booking</p>
-                            </div>
-                        </div>
-                        <div style="padding:12px 16px;">
-                            <label style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-dim);">Total PCs</label>
-                            <input type="number" id="settingsTotalPCs" class="input-glow" min="1" max="200" value="27" style="width:120px;">
-                        </div>
-                    </div>
-
-                    <!-- Shift Access Audit Logs Panel (Admin Only) -->
-                    <div class="settings-panel" id="auditLogsSection" style="display:none;grid-column:1/-1;">
-                        <div class="settings-panel-header" style="justify-content:space-between;align-items:center;">
-                            <div style="display:flex;align-items:center;gap:12px;">
-                                <div class="settings-panel-icon">📋</div>
-                                <div class="settings-panel-heading">
-                                    <h3>Shift Access Audit Logs</h3>
-                                    <p class="settings-panel-desc">Record of staff members who unlocked and viewed closed shift details</p>
-                                </div>
-                            </div>
-                            <button class="btn btn-sm btn-ghost" onclick="loadAuditLogs()" style="font-size:11px;padding:4px 10px;">🔄 Refresh Logs</button>
-                        </div>
-                        <div class="audit-logs-container" id="auditLogsContainer" style="padding:12px 16px;max-height:280px;overflow-y:auto;">
-                            <div style="text-align:center;color:var(--text-dim);font-size:12px;padding:16px;">Loading access logs...</div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-ghost" onclick="closeSettings()">Close</button>
-                <button class="btn btn-primary" onclick="saveSettings()">💾 Save Changes</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Shift Detail Auth Modal (Universal for Employees & Admins) -->
     <div class="modal-overlay" id="shiftAuthModal">
@@ -1020,7 +1028,7 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js"></script>
-    <script src="/static/js/app.js?v=47"></script>
+    <script src="/static/js/app.js?v=48"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
