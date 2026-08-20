@@ -85,6 +85,40 @@ class TestFinancialStats(unittest.TestCase):
         self.assertIn("stats", data)
         self.assertIn("kpis", data["stats"])
 
+    def test_empty_shifts_handling(self):
+        stats = compute_financial_stats([])
+        self.assertEqual(stats["kpis"]["total_shifts"], 0)
+        self.assertEqual(stats["kpis"]["gross_revenue"], 0.0)
+        self.assertEqual(stats["kpis"]["net_profit"], 0.0)
+        self.assertEqual(stats["kpis"]["total_expenses"], 0.0)
+        self.assertEqual(stats["timeline"], [])
+        self.assertEqual(stats["inventory_leaderboard"], [])
+        self.assertEqual(stats["expenses"], [])
+
+    def test_null_defensive_coercion(self):
+        # Create a mock shift with None in fields
+        from core.models import ShiftData, PackageEntry, PS5Session, InventoryItem, ExpenseEntry
+        bad_shift = ShiftData(
+            shift_id="test0001",
+            date="2026-08-20",
+            day="Thursday",
+            shift_name="Morning",
+            employee_name="Test Operator",
+            opened_at=None,
+            closed_at=None,
+            grand_total=None,
+            total_expenses=None,
+            morning_packages=[PackageEntry(pc_name=None, amount=None, hz=None, hrs=None)],
+            ps5_sessions=[PS5Session(ps_number=None, controllers=None, duration_hours=None, amount=None)],
+            inventory=[InventoryItem(name=None, opening_stock=None, restock_qty=None, closing_stock=None)],
+            expenses=[ExpenseEntry(description=None, amount=None)]
+        )
+        stats = compute_financial_stats([bad_shift])
+        self.assertEqual(stats["kpis"]["total_shifts"], 1)
+        self.assertEqual(stats["kpis"]["gross_revenue"], 0.0)
+        self.assertEqual(stats["kpis"]["total_expenses"], 0.0)
+
+
 
 if __name__ == "__main__":
     unittest.main()
