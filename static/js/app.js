@@ -1063,38 +1063,29 @@ function promptShiftViewAuth(shiftData) {
         const errorEl = document.getElementById('shiftAuthError');
         const targetShiftEl = document.getElementById('shiftAuthTargetShift');
 
-        targetShiftEl.textContent = `📅 ${shiftData.date || '--'} (${shiftData.shift_name || '--'} by ${shiftData.employee_name || '--'})`;
+        targetShiftEl.textContent = `${shiftData.date || '--'} (${shiftData.shift_name || '--'} by ${shiftData.employee_name || '--'})`;
         pinInput.value = '';
         errorEl.style.display = 'none';
         errorEl.textContent = '';
         submitBtn.disabled = false;
         submitBtn.textContent = '✓ Unlock & View';
 
-        // Populate select with Admins and Employees
-        select.innerHTML = '<option value="">Select your name...</option>';
-        
-        const adminGroup = document.createElement('optgroup');
-        adminGroup.label = '👑 Admins';
+        // Populate select with all names cleanly (no emojis, no optgroups)
+        select.innerHTML = '<option value="">Select name</option>';
+        const allNames = [];
         ['Rafay', 'Jahanzaib Khan'].forEach(name => {
-            const opt = document.createElement('option');
-            opt.value = name;
-            opt.textContent = `👑 ${name}`;
-            adminGroup.appendChild(opt);
+            if (!allNames.includes(name)) allNames.push(name);
         });
-        select.appendChild(adminGroup);
-
-        const empGroup = document.createElement('optgroup');
-        empGroup.label = '👤 Employees';
         const empList = (config.employees || []).length ? config.employees : (settingsData.employees || []);
         empList.forEach(name => {
-            if (name !== 'Rafay' && name !== 'Jahanzaib Khan') {
-                const opt = document.createElement('option');
-                opt.value = name;
-                opt.textContent = `👤 ${name}`;
-                empGroup.appendChild(opt);
-            }
+            if (!allNames.includes(name)) allNames.push(name);
         });
-        select.appendChild(empGroup);
+        allNames.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            select.appendChild(opt);
+        });
 
         let resolved = false;
         const close = () => {

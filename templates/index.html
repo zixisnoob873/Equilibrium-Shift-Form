@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=23">
+    <link rel="stylesheet" href="/static/css/style.css?v=24">
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js" as="script">
     <script src="/static/js/chart.umd.min.js"></script>
 </head>
@@ -972,9 +972,9 @@
                         </div>
                     </div>
                     <select id="shiftAuthUserSelect" data-cd-ignore style="width:100%;padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;margin-bottom:16px;">
-                        <option value="">Select your name...</option>
+                        <option value="">Select name</option>
                     </select>
-                    <input type="password" id="shiftAuthPinInput" class="input-glow" placeholder="Enter your PIN" style="width:100%;margin-bottom:8px;" autocomplete="new-password">
+                    <input type="password" id="shiftAuthPinInput" class="input-glow" placeholder="Enter PIN" style="width:100%;margin-bottom:8px;" autocomplete="new-password">
                     <p id="shiftAuthError" style="color:var(--danger);font-size:12px;margin-top:4px;display:none;"></p>
                 </div>
             </div>
@@ -1045,7 +1045,7 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js"></script>
-    <script src="/static/js/app.js?v=50"></script>
+    <script src="/static/js/app.js?v=51"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
