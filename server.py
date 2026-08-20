@@ -17,18 +17,14 @@ from flask_wtf.csrf import CSRFProtect, generate_csrf
 from flask_talisman import Talisman
 import threading
 from datetime import datetime, timedelta
-from config import APP_NAME, APP_VERSION, EMPLOYEES as DEFAULT_EMPLOYEES, INVENTORY_ITEMS as DEFAULT_INVENTORY, PACKAGES as DEFAULT_PACKAGES, DEFAULT_PS5_PRICING, DEFAULT_TOTAL_PCS, LOCAL_DATA_DIR, UPLOAD_DIR, SCREENSHOTS_DIR, PANCAFE_SCREENSHOTS_DIR, FORM_SCREENSHOTS_DIR, SHIFTS, detect_shift, get_current_date, get_current_day, DATA_DIR, BUNDLE_DIR
+from config import APP_NAME, APP_VERSION, EMPLOYEES as DEFAULT_EMPLOYEES, INVENTORY_ITEMS as DEFAULT_INVENTORY, PACKAGES as DEFAULT_PACKAGES, DEFAULT_PS5_PRICING, DEFAULT_TOTAL_PCS, LOCAL_DATA_DIR, UPLOAD_DIR, SCREENSHOTS_DIR, PANCAFE_SCREENSHOTS_DIR, FORM_SCREENSHOTS_DIR, SHIFTS, detect_shift, get_current_date, get_current_day
 from core.models import ShiftData, PackageEntry, PS5Session, InventoryItem, ExpenseEntry
 from core.shift_manager import ShiftManager
 from core.local_cache import save_shift, get_last_closed_shift, get_last_shift, get_last_active_shift, get_all_shifts, load_shift, log_shift_access, get_shift_access_logs, get_recent_closed_shift_ids
 from core.google_sheets import SUMMARY_SHEET_NAME, TRANSACTIONS_SHEET_NAME
 from core.analytics import compute_financial_stats
 
-app = Flask(
-    __name__,
-    template_folder=os.path.join(BUNDLE_DIR, "templates"),
-    static_folder=os.path.join(BUNDLE_DIR, "static")
-)
+app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
 app.config["WTF_CSRF_HEADERS"] = ["X-CSRFToken", "X-CSRF-Token"]
 app.config["WTF_CSRF_TIME_LIMIT"] = None
@@ -54,7 +50,7 @@ app.logger.setLevel(logging.WARNING)
 
 shift_manager = ShiftManager()
 
-SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
 
 DEFAULT_ADMIN_USERS = ["Rafay", "Jahanzaib Khan"]
 ADMIN_SESSION_TTL = 3600  # 1 hour
@@ -938,11 +934,7 @@ def serve_upload(filename):
 
 @app.route("/assets/<path:filename>")
 def serve_assets(filename):
-    bundle_assets = os.path.join(BUNDLE_DIR, "assets")
-    if os.path.exists(os.path.join(bundle_assets, filename)):
-        return send_from_directory(bundle_assets, filename)
-    data_assets = os.path.join(DATA_DIR, "assets")
-    return send_from_directory(data_assets, filename)
+    return send_from_directory("assets", filename)
 
 
 @app.route("/api/sheets/status")
@@ -1260,18 +1252,6 @@ if __name__ == "__main__":
     print("  |  " + url.center(34) + "  |")
     print("  " + "+" + "="*38 + "+")
     print()
-
-    # When bundled as a standalone .exe, open the browser automatically
-    if getattr(sys, 'frozen', False):
-        import webbrowser
-        def _auto_open_browser():
-            import time
-            time.sleep(0.6)
-            try:
-                webbrowser.open(url)
-            except Exception:
-                pass
-        threading.Thread(target=_auto_open_browser, daemon=True).start()
 
     try:
         import waitress

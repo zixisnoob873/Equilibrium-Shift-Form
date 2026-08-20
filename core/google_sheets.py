@@ -2,13 +2,13 @@ import json
 import os
 import threading
 from typing import Optional, Callable
-from .models import ShiftData
-from config import UPLOAD_DIR, BASE_URL, DATA_DIR
+from config import UPLOAD_DIR, BASE_URL
 from .local_cache import save_shift
 
-CREDENTIALS_FILE = os.path.join(DATA_DIR, "credentials.json")
-SHEET_ID_FILE = os.path.join(DATA_DIR, "sheet_id.txt")
-IMGBB_KEY_FILE = os.path.join(DATA_DIR, "imgbb_key.txt")
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CREDENTIALS_FILE = os.path.join(ROOT_DIR, "credentials.json")
+SHEET_ID_FILE = os.path.join(ROOT_DIR, "sheet_id.txt")
+IMGBB_KEY_FILE = os.path.join(ROOT_DIR, "imgbb_key.txt")
 
 SUMMARY_SHEET_NAME = "Shift Summary"
 TRANSACTIONS_SHEET_NAME = "Detailed Transactions"
