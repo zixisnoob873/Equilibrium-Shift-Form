@@ -542,10 +542,10 @@
                         <div class="fin-tier-list" id="finPkgTierList"></div>
                     </section>
 
-                    <!-- PS5 Gaming Lounge Breakdown Card -->
+                    <!-- PS5 Sessions Breakdown Card -->
                     <section class="card">
                         <div class="card-header">
-                            <h2><span class="accent-gold">🎮</span> PS5 Gaming Lounge</h2>
+                            <h2><span class="accent-gold">🎮</span> PS5 Sessions</h2>
                             <span class="badge-sm" id="finPS5TotalBadge">PKR 0.00</span>
                         </div>
                         <div class="fin-stream-summary">
@@ -568,29 +568,18 @@
                 </div>
 
                 <!-- Cafeteria & Top Selling Inventory Leaderboard -->
-                <div class="fin-details-grid">
-                    <section class="card">
-                        <div class="card-header">
-                            <h2><span class="accent-gold">☕</span> Top-Selling Cafeteria Items</h2>
-                            <span class="badge-sm" id="finCafeTotalBadge">Sale: PKR 0.00</span>
-                        </div>
-                        <div class="fin-table-wrap">
-                            <table class="data-table">
-                                <thead><tr><th>Rank</th><th>Item Name</th><th>Units Sold</th><th>Restocked</th></tr></thead>
-                                <tbody id="finInventoryLeaderboardBody"></tbody>
-                            </table>
-                        </div>
-                    </section>
-
-                    <!-- Expense Categories & Breakdown -->
-                    <section class="card">
-                        <div class="card-header">
-                            <h2><span class="accent-gold">💸</span> Expense Categorization</h2>
-                            <span class="badge-sm expense-total" id="finExpenseTotalBadge">PKR 0.00</span>
-                        </div>
-                        <div class="fin-category-list" id="finExpenseCategoryList"></div>
-                    </section>
-                </div>
+                <section class="card section-full">
+                    <div class="card-header">
+                        <h2><span class="accent-gold">☕</span> Top-Selling Cafeteria Items</h2>
+                        <span class="badge-sm" id="finCafeTotalBadge">Sale: PKR 0.00</span>
+                    </div>
+                    <div class="fin-table-wrap">
+                        <table class="data-table">
+                            <thead><tr><th>Rank</th><th>Item Name</th><th>Units Sold</th><th>Restocked</th></tr></thead>
+                            <tbody id="finInventoryLeaderboardBody"></tbody>
+                        </table>
+                    </div>
+                </section>
 
                 <!-- Employee Performance Matrix -->
                 <section class="card section-full">
@@ -613,29 +602,6 @@
                                 </tr>
                             </thead>
                             <tbody id="finEmployeeMatrixBody"></tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <!-- Itemized Expense Log (Recent 50) -->
-                <section class="card section-full">
-                    <div class="card-header">
-                        <h2><span class="accent-gold">📋</span> Itemized Expense Audit Log</h2>
-                        <span class="badge-sm" id="finExpenseCountBadge">0 entries</span>
-                    </div>
-                    <div class="fin-table-wrap" style="max-height:360px;overflow-y:auto;">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Shift</th>
-                                    <th>Employee</th>
-                                    <th>Category</th>
-                                    <th>Description</th>
-                                    <th>Amount (PKR)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="finExpenseLogBody"></tbody>
                         </table>
                     </div>
                 </section>

@@ -42,16 +42,14 @@ class TestFinancialE2E(unittest.TestCase):
             'id="finPS5ConsolesBody"',
             'id="finCafeTotalBadge"',
             'id="finInventoryLeaderboardBody"',
-            'id="finExpenseTotalBadge"',
-            'id="finExpenseCategoryList"',
             'id="finEmployeeMatrixBody"',
-            'id="finExpenseLogBody"',
             'id="finStartDate"',
             'id="finEndDate"',
             'id="finShiftFilter"',
             'id="finEmpFilter"',
             'id="finLoading"',
-            'id="finContent"'
+            'id="finContent"',
+            'PS5 Sessions'
         ]
         for s in required_strings:
             self.assertIn(s, html, f"Missing required HTML element/attribute: {s}")

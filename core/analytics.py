@@ -33,7 +33,8 @@ def compute_financial_stats(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     shift_name: Optional[str] = None,
-    employee_name: Optional[str] = None
+    employee_name: Optional[str] = None,
+    valid_ps_numbers: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
     Analyzes and aggregates all closed shift records into comprehensive financial metrics,
@@ -108,7 +109,12 @@ def compute_financial_stats(
     morning_pkg_count = 0
     nighter_pkg_count = 0
 
-    ps5_consoles: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"sessions": 0, "hours": 0, "revenue": 0.0})
+    ps5_consoles: Dict[str, Dict[str, Any]] = {}
+    if valid_ps_numbers:
+        for v in valid_ps_numbers:
+            ps5_consoles[str(v).strip()] = {"sessions": 0, "hours": 0, "revenue": 0.0}
+    else:
+        ps5_consoles = defaultdict(lambda: {"sessions": 0, "hours": 0, "revenue": 0.0})
     ps5_controllers: Dict[str, Dict[str, Any]] = {
         "1 Controller": {"sessions": 0, "hours": 0, "revenue": 0.0},
         "2 Controllers": {"sessions": 0, "hours": 0, "revenue": 0.0},
@@ -231,13 +237,27 @@ def compute_financial_stats(
             dur = int(ps.duration_hours or 1)
             total_ps5_hours += dur
             amt = float(ps.amount or 0.0)
-            ps_num = str(ps.ps_number or "Console").strip()
+            ps_num = str(ps.ps_number or "").strip()
             ctrls = int(ps.controllers or 2)
             is_ext = bool(ps.is_extended)
 
-            ps5_consoles[ps_num]["sessions"] += 1
-            ps5_consoles[ps_num]["hours"] += dur
-            ps5_consoles[ps_num]["revenue"] += amt
+            # Aggregate into consoles breakdown (only current/valid PS numbers)
+            if valid_ps_numbers:
+                # Direct match or case-insensitive match
+                matched_key = None
+                for k in ps5_consoles:
+                    if k.lower() == ps_num.lower():
+                        matched_key = k
+                        break
+                if matched_key:
+                    ps5_consoles[matched_key]["sessions"] += 1
+                    ps5_consoles[matched_key]["hours"] += dur
+                    ps5_consoles[matched_key]["revenue"] += amt
+            else:
+                if ps_num:
+                    ps5_consoles[ps_num]["sessions"] += 1
+                    ps5_consoles[ps_num]["hours"] += dur
+                    ps5_consoles[ps_num]["revenue"] += amt
 
             if is_ext:
                 ps5_controllers["Extended Sessions"]["sessions"] += 1
@@ -343,14 +363,26 @@ def compute_financial_stats(
 
     # PS5 consoles list
     ps5_consoles_list = []
-    for c_name, data in ps5_consoles.items():
-        ps5_consoles_list.append({
-            "console": c_name,
-            "sessions": data["sessions"],
-            "hours": data["hours"],
-            "revenue": round(data["revenue"], 2)
-        })
-    ps5_consoles_list.sort(key=lambda x: x["revenue"], reverse=True)
+    if valid_ps_numbers:
+        for c_name in valid_ps_numbers:
+            data = ps5_consoles.get(c_name, {"sessions": 0, "hours": 0, "revenue": 0.0})
+            label = f"PS5 #{c_name}" if c_name.isdigit() else f"PS5 {c_name}" if not c_name.upper().startswith("PS") else c_name
+            ps5_consoles_list.append({
+                "console": label,
+                "sessions": data["sessions"],
+                "hours": data["hours"],
+                "revenue": round(data["revenue"], 2)
+            })
+    else:
+        for c_name, data in ps5_consoles.items():
+            label = f"PS5 #{c_name}" if c_name.isdigit() else f"PS5 {c_name}" if not c_name.upper().startswith("PS") else c_name
+            ps5_consoles_list.append({
+                "console": label,
+                "sessions": data["sessions"],
+                "hours": data["hours"],
+                "revenue": round(data["revenue"], 2)
+            })
+        ps5_consoles_list.sort(key=lambda x: x["revenue"], reverse=True)
 
     # PS5 controllers list
     ps5_controllers_list = []

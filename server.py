@@ -638,12 +638,16 @@ def admin_financial_stats():
     employee_name = request.args.get("employee_name", "").strip() or None
 
     all_shifts = get_all_shifts()
+    settings = load_settings()
+    ps5_numbers = settings.get("ps5_numbers", ["1", "2", "3", "PC"])
+
     stats = compute_financial_stats(
         all_shifts,
         start_date=start_date,
         end_date=end_date,
         shift_name=shift_name,
-        employee_name=employee_name
+        employee_name=employee_name,
+        valid_ps_numbers=ps5_numbers
     )
     return jsonify({"success": True, "admin": admin, "stats": stats})
 

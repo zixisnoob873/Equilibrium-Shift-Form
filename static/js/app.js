@@ -4508,37 +4508,6 @@ function renderFinancialDashboard(stats) {
         }
     }
 
-    // 5. Expense Categories List
-    document.getElementById('finExpenseTotalBadge').textContent = fmtPkr(kpis.total_expenses);
-    const catList = document.getElementById('finExpenseCategoryList');
-    if (catList) {
-        const cats = stats.expense_categories || [];
-        if (!cats.length) {
-            catList.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No expenses in this period</div>';
-        } else {
-            const getTagClass = c => {
-                const lc = (c || '').toLowerCase();
-                if (lc.includes('stock')) return 'cat-stock';
-                if (lc.includes('topup')) return 'cat-topup';
-                if (lc.includes('food')) return 'cat-food';
-                if (lc.includes('clean')) return 'cat-cleaning';
-                if (lc.includes('maint')) return 'cat-maint';
-                return 'cat-other';
-            };
-            catList.innerHTML = cats.map(c => `
-                <div class="cat-row">
-                    <div class="cat-row-top">
-                        <span class="cat-tag ${getTagClass(c.category)}">${escHtml(c.category)}</span>
-                        <span>${fmtPkrZero(c.amount)} <small style="color:var(--text-dim)">(${c.percentage}%)</small></span>
-                    </div>
-                    <div class="cat-bar-track">
-                        <div class="cat-bar-fill" style="width:${Math.min(100, Math.max(2, c.percentage))}%;"></div>
-                    </div>
-                </div>
-            `).join('');
-        }
-    }
-
     // 6. Operator / Employee Performance Table
     const empBody = document.getElementById('finEmployeeMatrixBody');
     if (empBody) {
@@ -4557,37 +4526,6 @@ function renderFinancialDashboard(stats) {
                     <td>${fmtPkrZero(e.online_collected)}</td>
                     <td>${fmtPkrZero(e.pos_collected)}</td>
                     <td style="color:var(--text-bright);font-weight:600;">${fmtPkrZero(e.avg_revenue_per_shift)}</td>
-                </tr>
-            `).join('');
-        }
-    }
-
-    // 7. Itemized Expense Log (Top 50)
-    const expCountBadge = document.getElementById('finExpenseCountBadge');
-    if (expCountBadge) expCountBadge.textContent = `${(stats.expenses || []).length} total`;
-    const expBody = document.getElementById('finExpenseLogBody');
-    if (expBody) {
-        const exps = (stats.expenses || []).slice(0, 50);
-        if (!exps.length) {
-            expBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:14px;">No expenses recorded</td></tr>';
-        } else {
-            const getTagClass = c => {
-                const lc = (c || '').toLowerCase();
-                if (lc.includes('stock')) return 'cat-stock';
-                if (lc.includes('topup')) return 'cat-topup';
-                if (lc.includes('food')) return 'cat-food';
-                if (lc.includes('clean')) return 'cat-cleaning';
-                if (lc.includes('maint')) return 'cat-maint';
-                return 'cat-other';
-            };
-            expBody.innerHTML = exps.map(e => `
-                <tr>
-                    <td style="color:var(--text-dim);font-size:12px;">${escHtml(e.date)}</td>
-                    <td>${escHtml(e.shift)}</td>
-                    <td>${escHtml(e.employee)}</td>
-                    <td><span class="cat-tag ${getTagClass(e.category)}">${escHtml(e.category)}</span></td>
-                    <td><strong>${escHtml(e.description)}</strong></td>
-                    <td style="color:#fb7185;font-weight:700;">PKR ${parseFloat(e.amount).toFixed(2)}</td>
                 </tr>
             `).join('');
         }
