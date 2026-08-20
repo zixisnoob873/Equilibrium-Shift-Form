@@ -1,5 +1,21 @@
 import os
+import sys
 from datetime import datetime
+
+def get_bundle_dir() -> str:
+    """Returns the base directory for read-only bundled assets (templates, static, assets)."""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
+def get_data_dir() -> str:
+    """Returns the directory for persistent data (settings.json, local_data, credentials)."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+BUNDLE_DIR = get_bundle_dir()
+DATA_DIR = get_data_dir()
 
 APP_NAME = "Gaming Zone Shift Management"
 APP_VERSION = "2.0.0"
@@ -20,9 +36,9 @@ SHIFTS = {
     "Night":    (0, 8)
 }
 
-LOCAL_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "local_data")
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
-SCREENSHOTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "screenshots")
+LOCAL_DATA_DIR = os.path.join(DATA_DIR, "local_data")
+UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
+SCREENSHOTS_DIR = os.path.join(DATA_DIR, "screenshots")
 PANCAFE_SCREENSHOTS_DIR = os.path.join(SCREENSHOTS_DIR, "pancafe_screenshot")
 FORM_SCREENSHOTS_DIR = os.path.join(SCREENSHOTS_DIR, "shift_form_screenshot")
 

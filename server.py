@@ -15,15 +15,20 @@ from flask import Flask, jsonify, request, render_template, send_from_directory
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect, generate_csrf
 from flask_talisman import Talisman
-from datetime import datetime
-from config import APP_NAME, APP_VERSION, EMPLOYEES as DEFAULT_EMPLOYEES, INVENTORY_ITEMS as DEFAULT_INVENTORY, PACKAGES as DEFAULT_PACKAGES, DEFAULT_PS5_PRICING, DEFAULT_TOTAL_PCS, UPLOAD_DIR, SCREENSHOTS_DIR, PANCAFE_SCREENSHOTS_DIR, FORM_SCREENSHOTS_DIR, SHIFTS, detect_shift, get_current_date, get_current_day
+import threading
+from datetime import datetime, timedelta
+from config import APP_NAME, APP_VERSION, EMPLOYEES as DEFAULT_EMPLOYEES, INVENTORY_ITEMS as DEFAULT_INVENTORY, PACKAGES as DEFAULT_PACKAGES, DEFAULT_PS5_PRICING, DEFAULT_TOTAL_PCS, LOCAL_DATA_DIR, UPLOAD_DIR, SCREENSHOTS_DIR, PANCAFE_SCREENSHOTS_DIR, FORM_SCREENSHOTS_DIR, SHIFTS, detect_shift, get_current_date, get_current_day, DATA_DIR, BUNDLE_DIR
 from core.models import ShiftData, PackageEntry, PS5Session, InventoryItem, ExpenseEntry
 from core.shift_manager import ShiftManager
 from core.local_cache import save_shift, get_last_closed_shift, get_last_shift, get_last_active_shift, get_all_shifts, load_shift, log_shift_access, get_shift_access_logs, get_recent_closed_shift_ids
 from core.google_sheets import SUMMARY_SHEET_NAME, TRANSACTIONS_SHEET_NAME
 from core.analytics import compute_financial_stats
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BUNDLE_DIR, "templates"),
+    static_folder=os.path.join(BUNDLE_DIR, "static")
+)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
 app.config["WTF_CSRF_HEADERS"] = ["X-CSRFToken", "X-CSRF-Token"]
 app.config["WTF_CSRF_TIME_LIMIT"] = None
@@ -49,7 +54,7 @@ app.logger.setLevel(logging.WARNING)
 
 shift_manager = ShiftManager()
 
-SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
+SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 
 DEFAULT_ADMIN_USERS = ["Rafay", "Jahanzaib Khan"]
 ADMIN_SESSION_TTL = 3600  # 1 hour
@@ -694,10 +699,11 @@ def handle_settings():
     if not isinstance(ps5_numbers, list) or not all(isinstance(n, str) for n in ps5_numbers):
         return jsonify({"success": False, "error": "ps5_numbers must be a list of strings"}), 400
     total_pcs = data.get("total_pcs", DEFAULT_TOTAL_PCS)
-    if isinstance(total_pcs, float) and total_pcs == int(total_pcs):
-        total_pcs = int(total_pcs)
-    if not isinstance(total_pcs, int) or total_pcs < 1:
-        return jsonify({"success": False, "error": "total_pcs must be a positive integer"}), 400
+    try:
+        total_pcs = int(float(total_pcs))
+        total_pcs = max(1, min(500, total_pcs))
+    except (TypeError, ValueError):
+        total_pcs = DEFAULT_TOTAL_PCS
     current["employees"] = employees
     current["inventory_items"] = inventory_items
     current["packages"] = packages
@@ -932,13 +938,116 @@ def serve_upload(filename):
 
 @app.route("/assets/<path:filename>")
 def serve_assets(filename):
-    return send_from_directory("assets", filename)
+    bundle_assets = os.path.join(BUNDLE_DIR, "assets")
+    if os.path.exists(os.path.join(bundle_assets, filename)):
+        return send_from_directory(bundle_assets, filename)
+    data_assets = os.path.join(DATA_DIR, "assets")
+    return send_from_directory(data_assets, filename)
 
 
 @app.route("/api/sheets/status")
 def sheets_status():
     ready = shift_manager.sheets.is_ready()
     return jsonify({"configured": ready})
+
+
+_ALARMS_LOCK = threading.Lock()
+PENDING_ALARMS_FILE = os.path.join(LOCAL_DATA_DIR, "pending_alarms.json")
+
+def _load_pending_alarms():
+    if not os.path.exists(PENDING_ALARMS_FILE):
+        return []
+    try:
+        with open(PENDING_ALARMS_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def _save_pending_alarms(alarms):
+    os.makedirs(LOCAL_DATA_DIR, exist_ok=True)
+    import tempfile
+    fd, tmp = tempfile.mkstemp(dir=LOCAL_DATA_DIR)
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(alarms, f, indent=2)
+        os.replace(tmp, PENDING_ALARMS_FILE)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+@app.route("/api/alarms/schedule", methods=["POST"])
+def schedule_alarms():
+    data = request.get_json() or {}
+    incoming = data.get("sessions", [])
+    now = datetime.now()
+    cutoff_24h = (now - timedelta(hours=24)).timestamp() * 1000
+    cutoff_7d = (now - timedelta(days=7)).timestamp() * 1000
+
+    with _ALARMS_LOCK:
+        existing = _load_pending_alarms()
+        alarm_map = {a["id"]: a for a in existing}
+
+        for s in incoming:
+            sid = s.get("id")
+            if not sid:
+                continue
+            end_ts = s.get("endTs", 0)
+            end_dt = datetime.fromtimestamp(end_ts / 1000.0) if end_ts else now
+            if sid in alarm_map:
+                alarm_map[sid]["end_timestamp"] = end_dt.isoformat()
+                alarm_map[sid]["end_ts"] = end_ts
+                alarm_map[sid]["endTotalMin"] = s.get("endTotalMin", 0)
+                alarm_map[sid]["psNumber"] = s.get("psNumber", "")
+            else:
+                alarm_map[sid] = {
+                    "id": sid,
+                    "psNumber": s.get("psNumber", ""),
+                    "end_timestamp": end_dt.isoformat(),
+                    "end_ts": end_ts,
+                    "endTotalMin": s.get("endTotalMin", 0),
+                    "acknowledged": False
+                }
+
+        # GC: drop only acknowledged alarms older than 24h, or never acked older than 7d
+        cleaned = []
+        for a in alarm_map.values():
+            ts = a.get("end_ts", 0)
+            if a.get("acknowledged", False):
+                if ts >= cutoff_24h:
+                    cleaned.append(a)
+            else:
+                if ts >= cutoff_7d:
+                    cleaned.append(a)
+
+        _save_pending_alarms(cleaned)
+    return jsonify({"success": True, "count": len(cleaned)})
+
+@app.route("/api/alarms/pending", methods=["GET"])
+def get_pending_alarms():
+    now_ms = datetime.now().timestamp() * 1000
+    with _ALARMS_LOCK:
+        alarms = _load_pending_alarms()
+        pending = [a for a in alarms if not a.get("acknowledged", False) and a.get("end_ts", 0) <= now_ms]
+    return jsonify({"success": True, "alarms": pending})
+
+@app.route("/api/alarms/acknowledge", methods=["POST"])
+def acknowledge_alarms():
+    data = request.get_json() or {}
+    ids = data.get("ids", [])
+    if isinstance(ids, str):
+        ids = [ids]
+    ids_set = set(ids)
+
+    with _ALARMS_LOCK:
+        alarms = _load_pending_alarms()
+        for a in alarms:
+            if a.get("id") in ids_set:
+                a["acknowledged"] = True
+        _save_pending_alarms(alarms)
+    return jsonify({"success": True, "acknowledged": list(ids_set)})
 
 
 @app.route("/api/sheets/sync-shift/<shift_id>", methods=["POST"])
@@ -1151,6 +1260,18 @@ if __name__ == "__main__":
     print("  |  " + url.center(34) + "  |")
     print("  " + "+" + "="*38 + "+")
     print()
+
+    # When bundled as a standalone .exe, open the browser automatically
+    if getattr(sys, 'frozen', False):
+        import webbrowser
+        def _auto_open_browser():
+            import time
+            time.sleep(0.6)
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
+        threading.Thread(target=_auto_open_browser, daemon=True).start()
 
     try:
         import waitress

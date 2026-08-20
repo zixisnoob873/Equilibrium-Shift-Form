@@ -28,6 +28,11 @@ __pycache__/
 venv/
 env/
 
+# --- PyInstaller Build Folders ---
+build/
+dist/
+*.new.exe
+
 # --- IDE & OS Files ---
 .vscode/
 .idea/
