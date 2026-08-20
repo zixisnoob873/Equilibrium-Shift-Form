@@ -1,0 +1,35 @@
+# ==========================================
+# Gaming Zone Shift Management - .gitignore
+# ==========================================
+
+# --- Live Runtime Shift & Audit Data ---
+local_data/
+uploads/
+screenshots/
+sync_errors.jsonl
+*.tmp
+*.log
+
+# --- Sensitive API & Google Credentials ---
+credentials.json
+sheet_id.txt
+imgbb_key.txt
+
+# --- Live Counter Settings & PIN Hashes ---
+# (Use settings.example.json as a clean template)
+settings.json
+
+# --- Python Cache & Virtual Environments ---
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv/
+venv/
+env/
+
+# --- IDE & OS Files ---
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

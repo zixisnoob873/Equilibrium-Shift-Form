@@ -1,0 +1,87 @@
+CURRENT GOOGLE SHEETS LAYOUT / HEADERS
+========================================
+Source: core/google_sheets.py (SUMMARY_HEADERS / TRANSACTIONS_HEADERS
+constants) + server.py (clear_sheets). Single source of truth is
+core/google_sheets.py. Synced rows are appended positionally - order
+here MUST match the append code in _append_summary / _append_transactions.
+
+SHEET 1: "Shift Summary"  (26 columns, one row per shift)
+----------------------------------------------------------
+ 1  Shift ID
+ 2  Date
+ 3  Day
+ 4  Shift Timing
+ 5  Employee Name
+ 6  Topup Sale
+ 7  Morning Pkg Sale
+ 8  Nighter Pkg Sale
+ 9  PS5 Sale
+10  Cafeteria Sale
+11  Total                    = grand_total (gross; expenses NOT subtracted)
+12  Online Payments
+13  Cash Received
+14  Actual POS Amount
+15  Total Payment Received   = cash + online + pos (computed)
+16  Total Expenses
+17  Reconciliation           = Total - Total Payment - Total Expenses (computed)
+18  Grand Total              = Total - Total Expenses (net; computed)
+19  Total TAX Amount
+20  Morning Pkg Count
+21  Nighter Pkg Count
+22  PS5 Session Count
+23  Inventory
+24  Closed At
+25  Pancafe Screenshot
+26  Form Screenshot
+
+Row values appended (in order):
+shift_id, date, day, shift_timing, employee_name, topup_sale,
+morning_pkg_total, nighter_pkg_total, ps5_total, cafeteria_sale,
+total_sale, online_payments, cash_received, actual_pos_amount,
+total_payment, total_expenses, reconciliation, grand_total_net,
+total_tax_amount, len(morning_packages), len(nighter_packages),
+len(ps5_sessions), inv_str, closed_at, pancafe_url, form_url
+
+SHEET 2: "Detailed Transactions"  (14 columns, one row per package / PS5 session)
+-------------------------------------------------------------------------------
+ 1  Date
+ 2  Day
+ 3  Shift Name
+ 4  Employee
+ 5  Type
+ 6  Item / Notes
+ 7  Controllers
+ 8  Start Time
+ 9  End Time
+10  Duration (hrs)
+11  Amount (PKR)
+12  Cash Received
+13  Online Payments
+14  Timestamp
+
+Type values: "Morning Package" | "Nighter Package" | "PS5 Session"
+
+Row values appended (in order):
+date, day, shift_name, employee_name, type, notes, controllers,
+start_time, end_time, duration_hours, amount, cash_received,
+online_payments, timestamp
+
+SCREENSHOT URL PERSISTENCE (ImgBB rate-limit safety)
+-----------------------------------------------------
+- ShiftData stores pancafe_screenshot_url / form_screenshot_url locally so a
+  screenshot is uploaded to ImgBB at most once. Sync reuses the stored URL;
+  Clear Sheets harvests existing sheet URLs onto local shift files before
+  wiping; re-upload persists fresh URLs too.
+- _append_summary() calls _resolve_screenshot_url() which returns (url,
+  changed); a changed flag triggers save_shift so future re-syncs skip ImgBB.
+
+NOTES
+-------
+- Summary sheet created with cols=len(SUMMARY_HEADERS); transactions sheet
+  with cols=len(TRANSACTIONS_HEADERS)+1 (one trailing spare column).
+- Column 11 "Total" == stored grand_total (gross). Column 18 "Grand Total"
+  == net = grand_total - total_expenses. Reconciliation ~ 0 by design.
+- Fallback positional deps: sync-all dedup uses row[0]|row[3]|row[10]
+  (Date|Employee|Total) ONLY on legacy sheets without a "Shift ID" column;
+  new-layout sheets always dedup by Shift ID (col A). Transaction dedup
+  fallback indices Employee=3, Timestamp=13. Re-upload fallback cols 23/24.

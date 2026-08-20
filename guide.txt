@@ -1,0 +1,30 @@
+1. Create a Google Cloud Project
+
+Go to https://console.cloud.google.com/
+Create a new project (or select existing)
+Enable Google Sheets API and Google Drive API (both under "APIs & Services > Library")
+2. Create a Service Account
+
+Go to APIs & Services > Credentials
+Click + Create Credentials > Service Account → name it anything
+Click Done (skip optional fields)
+Click on the service account → Keys tab → Add Key > Create New Key
+Choose JSON → download the file
+3. Save the file
+
+Rename the downloaded JSON to credentials.json
+Place it in the project root: C:\Users\equilibrium\Desktop\Equilibrium-Shift-Form-main\credentials.json
+4. Get your Google Sheet ID
+
+Create a new Google Sheet (or use existing)
+From the URL: https://docs.google.com/spreadsheets/d/**THIS_PART**/edit
+Copy that ID and paste it into sheet_id.txt (new file in project root)
+5. Share the sheet with your service account
+
+Open your Google Sheet → click Share
+Find the client_email from your credentials.json (looks like xxx@xxx.iam.gserviceaccount.com)
+Add it as an Editor
+6. Run setup
+
+install-requirements.bat
+py setup_sheets.py
