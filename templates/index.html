@@ -8,8 +8,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=18">
+    <link rel="stylesheet" href="/static/css/style.css?v=19">
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js" as="script">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <header class="header">
@@ -20,6 +21,7 @@
             <nav class="nav-links" id="navBar">
                 <button class="nav-btn" onclick="showFormView()" id="navFormBtn">Shift Form</button>
                 <button class="nav-btn" onclick="showHistoryView()" id="navHistoryBtn">📜 Shift History</button>
+                <button class="nav-btn" onclick="showFinancialsView()" id="navFinancialsBtn">📊 Financials</button>
                 <button class="nav-btn" onclick="openSettings()">⚙ Settings</button>
                 <button class="nav-btn" onclick="toggleTimerDashboard()">⏱ Timer</button>
             </nav>
@@ -377,6 +379,269 @@
                 </div>
             </section>
         </div>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- VIEW 4: Admin Financial Dashboard               -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <div id="financialDashboardView" style="display:none;">
+            <!-- Header Controls & Filters -->
+            <section class="card section-full fin-header-card">
+                <div class="fin-header-top">
+                    <div>
+                        <h2 class="fin-title"><span class="accent-gold">◈</span> Financial Analytics &amp; Reports</h2>
+                        <p class="fin-subtitle">Executive profit &amp; loss analysis, revenue streams, and shift performance</p>
+                    </div>
+                    <div class="fin-header-actions">
+                        <button class="btn btn-sm btn-ghost" onclick="exportFinancialsToCSV()" title="Export filtered data to CSV">📥 Export CSV</button>
+                        <button class="btn btn-sm btn-ghost" onclick="refreshFinancials()" title="Refresh statistics">🔄 Refresh</button>
+                    </div>
+                </div>
+
+                <div class="fin-filter-bar">
+                    <div class="fin-presets">
+                        <button class="fin-chip active" data-preset="all" onclick="setFinancialPreset('all')">All Time</button>
+                        <button class="fin-chip" data-preset="today" onclick="setFinancialPreset('today')">Today</button>
+                        <button class="fin-chip" data-preset="yesterday" onclick="setFinancialPreset('yesterday')">Yesterday</button>
+                        <button class="fin-chip" data-preset="7d" onclick="setFinancialPreset('7d')">Last 7 Days</button>
+                        <button class="fin-chip" data-preset="30d" onclick="setFinancialPreset('30d')">Last 30 Days</button>
+                        <button class="fin-chip" data-preset="this_month" onclick="setFinancialPreset('this_month')">This Month</button>
+                    </div>
+                    <div class="fin-custom-filters">
+                        <div class="fin-date-group">
+                            <label>From</label>
+                            <input type="date" id="finStartDate" class="input-glow fin-date-input" onchange="onFinancialDateChange()">
+                        </div>
+                        <div class="fin-date-group">
+                            <label>To</label>
+                            <input type="date" id="finEndDate" class="input-glow fin-date-input" onchange="onFinancialDateChange()">
+                        </div>
+                        <div class="fin-select-group">
+                            <label>Shift</label>
+                            <select id="finShiftFilter" class="input-glow" onchange="loadFinancialStats()">
+                                <option value="all">All Shifts</option>
+                                <option value="Morning">Morning</option>
+                                <option value="Evening">Evening</option>
+                                <option value="Night">Night</option>
+                            </select>
+                        </div>
+                        <div class="fin-select-group">
+                            <label>Employee</label>
+                            <select id="finEmpFilter" class="input-glow" onchange="loadFinancialStats()">
+                                <option value="all">All Employees</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Loading Spinner -->
+            <div id="finLoading" class="fin-loading" style="display:none;">
+                <span class="spinner" style="margin:0 auto 12px;"></span>
+                <p>Calculating financial metrics from shift archive...</p>
+            </div>
+
+            <div id="finContent" style="display:none;">
+                <!-- 4 Executive KPI Cards -->
+                <div class="fin-kpi-grid">
+                    <div class="fin-kpi-card gross-card">
+                        <div class="kpi-icon-wrap gold-glow">💰</div>
+                        <div class="kpi-info">
+                            <span class="kpi-label">Gross Revenue</span>
+                            <span class="kpi-value gold" id="kpiGrossRevenue">PKR 0.00</span>
+                            <span class="kpi-sub" id="kpiShiftsCount">0 shifts</span>
+                        </div>
+                    </div>
+                    <div class="fin-kpi-card expense-card">
+                        <div class="kpi-icon-wrap rose-glow">💸</div>
+                        <div class="kpi-info">
+                            <span class="kpi-label">Total Expenses</span>
+                            <span class="kpi-value rose" id="kpiTotalExpenses">PKR 0.00</span>
+                            <span class="kpi-sub" id="kpiAvgExp">Avg: PKR 0.00 / shift</span>
+                        </div>
+                    </div>
+                    <div class="fin-kpi-card profit-card">
+                        <div class="kpi-icon-wrap green-glow">💎</div>
+                        <div class="kpi-info">
+                            <span class="kpi-label">Net Profit</span>
+                            <span class="kpi-value green" id="kpiNetProfit">PKR 0.00</span>
+                            <span class="kpi-sub" id="kpiAvgProfit">Avg: PKR 0.00 / shift</span>
+                        </div>
+                    </div>
+                    <div class="fin-kpi-card cash-card">
+                        <div class="kpi-icon-wrap blue-glow">💳</div>
+                        <div class="kpi-info">
+                            <span class="kpi-label">Net Collected (Cash Flow)</span>
+                            <span class="kpi-value blue" id="kpiNetCollected">PKR 0.00</span>
+                            <span class="kpi-sub" id="kpiPeakShift">Peak: --</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart Row 1: Revenue & Profit Trend + Revenue Streams Donut -->
+                <div class="fin-charts-grid">
+                    <section class="card fin-chart-box">
+                        <div class="card-header">
+                            <h2><span class="accent-gold">📈</span> Daily Revenue &amp; Profit Trend</h2>
+                        </div>
+                        <div class="chart-container" style="position:relative;height:320px;width:100%;">
+                            <canvas id="finTrendChart"></canvas>
+                        </div>
+                    </section>
+
+                    <section class="card fin-chart-box">
+                        <div class="card-header">
+                            <h2><span class="accent-gold">🍩</span> Revenue Streams Breakdown</h2>
+                        </div>
+                        <div class="chart-container donut-container" style="position:relative;height:320px;width:100%;">
+                            <canvas id="finStreamsChart"></canvas>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Chart Row 2: Payment Methods Pie + Shift Type Comparison Bar -->
+                <div class="fin-charts-grid">
+                    <section class="card fin-chart-box">
+                        <div class="card-header">
+                            <h2><span class="accent-gold">💳</span> Payment Methods Distribution</h2>
+                        </div>
+                        <div class="chart-container donut-container" style="position:relative;height:280px;width:100%;">
+                            <canvas id="finPaymentsChart"></canvas>
+                        </div>
+                    </section>
+
+                    <section class="card fin-chart-box">
+                        <div class="card-header">
+                            <h2><span class="accent-gold">⚖️</span> Shift Performance Comparison</h2>
+                        </div>
+                        <div class="chart-container" style="position:relative;height:280px;width:100%;">
+                            <canvas id="finShiftCompChart"></canvas>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Detailed Breakdown Grids -->
+                <div class="fin-details-grid">
+                    <!-- Morning & Nighter Packages Breakdown Card -->
+                    <section class="card">
+                        <div class="card-header">
+                            <h2><span class="accent-gold">📦</span> PC Packages Analysis</h2>
+                            <span class="badge-sm" id="finPkgTotalBadge">0 total</span>
+                        </div>
+                        <div class="fin-stream-summary">
+                            <div class="stream-stat">
+                                <label>🌅 Morning Packages</label>
+                                <span class="stream-val" id="finMorningVal">PKR 0.00</span>
+                                <span class="stream-sub" id="finMorningCount">0 booked</span>
+                            </div>
+                            <div class="stream-stat">
+                                <label>🌙 Nighter Packages</label>
+                                <span class="stream-val" id="finNighterVal">PKR 0.00</span>
+                                <span class="stream-sub" id="finNighterCount">0 booked</span>
+                            </div>
+                        </div>
+                        <div class="fin-tier-list" id="finPkgTierList"></div>
+                    </section>
+
+                    <!-- PS5 Gaming Lounge Breakdown Card -->
+                    <section class="card">
+                        <div class="card-header">
+                            <h2><span class="accent-gold">🎮</span> PS5 Gaming Lounge</h2>
+                            <span class="badge-sm" id="finPS5TotalBadge">PKR 0.00</span>
+                        </div>
+                        <div class="fin-stream-summary">
+                            <div class="stream-stat">
+                                <label>Total Sessions</label>
+                                <span class="stream-val" id="finPS5SessionsVal">0</span>
+                            </div>
+                            <div class="stream-stat">
+                                <label>Gaming Hours Played</label>
+                                <span class="stream-val" id="finPS5HoursVal">0 hrs</span>
+                            </div>
+                        </div>
+                        <div class="fin-table-wrap">
+                            <table class="data-table">
+                                <thead><tr><th>Console</th><th>Sessions</th><th>Hours</th><th>Revenue (PKR)</th></tr></thead>
+                                <tbody id="finPS5ConsolesBody"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Cafeteria & Top Selling Inventory Leaderboard -->
+                <div class="fin-details-grid">
+                    <section class="card">
+                        <div class="card-header">
+                            <h2><span class="accent-gold">☕</span> Top-Selling Cafeteria Items</h2>
+                            <span class="badge-sm" id="finCafeTotalBadge">Sale: PKR 0.00</span>
+                        </div>
+                        <div class="fin-table-wrap">
+                            <table class="data-table">
+                                <thead><tr><th>Rank</th><th>Item Name</th><th>Units Sold</th><th>Restocked</th></tr></thead>
+                                <tbody id="finInventoryLeaderboardBody"></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- Expense Categories & Breakdown -->
+                    <section class="card">
+                        <div class="card-header">
+                            <h2><span class="accent-gold">💸</span> Expense Categorization</h2>
+                            <span class="badge-sm expense-total" id="finExpenseTotalBadge">PKR 0.00</span>
+                        </div>
+                        <div class="fin-category-list" id="finExpenseCategoryList"></div>
+                    </section>
+                </div>
+
+                <!-- Employee Performance Matrix -->
+                <section class="card section-full">
+                    <div class="card-header">
+                        <h2><span class="accent-gold">👤</span> Operator &amp; Employee Performance</h2>
+                    </div>
+                    <div class="fin-table-wrap">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Shifts</th>
+                                    <th>Gross Revenue</th>
+                                    <th>Expenses Handled</th>
+                                    <th>Net Profit</th>
+                                    <th>Cash Collected</th>
+                                    <th>Online Transfers</th>
+                                    <th>POS Cards</th>
+                                    <th>Avg / Shift</th>
+                                </tr>
+                            </thead>
+                            <tbody id="finEmployeeMatrixBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Itemized Expense Log (Recent 50) -->
+                <section class="card section-full">
+                    <div class="card-header">
+                        <h2><span class="accent-gold">📋</span> Itemized Expense Audit Log</h2>
+                        <span class="badge-sm" id="finExpenseCountBadge">0 entries</span>
+                    </div>
+                    <div class="fin-table-wrap" style="max-height:360px;overflow-y:auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Shift</th>
+                                    <th>Employee</th>
+                                    <th>Category</th>
+                                    <th>Description</th>
+                                    <th>Amount (PKR)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="finExpenseLogBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div>
+
 
     </main>
 

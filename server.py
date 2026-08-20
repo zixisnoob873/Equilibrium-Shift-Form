@@ -21,6 +21,7 @@ from core.models import ShiftData, PackageEntry, PS5Session, InventoryItem, Expe
 from core.shift_manager import ShiftManager
 from core.local_cache import save_shift, get_last_closed_shift, get_last_shift, get_last_active_shift, get_all_shifts, load_shift, log_shift_access, get_shift_access_logs, get_recent_closed_shift_ids
 from core.google_sheets import SUMMARY_SHEET_NAME, TRANSACTIONS_SHEET_NAME
+from core.analytics import compute_financial_stats
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
@@ -623,6 +624,29 @@ def admin_audit_logs():
     if admin not in get_admin_users():
         return jsonify({"success": False, "error": "Access restricted to owners"}), 403
     return jsonify({"success": True, "logs": get_shift_access_logs(limit=100)})
+
+
+@app.route("/api/admin/financial-stats", methods=["GET"])
+def admin_financial_stats():
+    admin = _require_admin()
+    if admin is None:
+        return jsonify({"success": False, "error": "Admin auth required"}), 401
+
+    start_date = request.args.get("start_date", "").strip() or None
+    end_date = request.args.get("end_date", "").strip() or None
+    shift_name = request.args.get("shift_name", "").strip() or None
+    employee_name = request.args.get("employee_name", "").strip() or None
+
+    all_shifts = get_all_shifts()
+    stats = compute_financial_stats(
+        all_shifts,
+        start_date=start_date,
+        end_date=end_date,
+        shift_name=shift_name,
+        employee_name=employee_name
+    )
+    return jsonify({"success": True, "admin": admin, "stats": stats})
+
 
 
 RESTRICTED_KEYS = {"employees", "packages", "ps5_pricing", "ps5_numbers", "total_pcs"}

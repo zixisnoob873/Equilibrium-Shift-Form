@@ -1219,9 +1219,14 @@ async function showHistoryView() {
 }
 
 function hideAllViews() {
-    document.getElementById('shiftFormView').style.display = 'none';
-    document.getElementById('closedShiftView').style.display = 'none';
-    document.getElementById('historyView').style.display = 'none';
+    const v1 = document.getElementById('shiftFormView');
+    const v2 = document.getElementById('closedShiftView');
+    const v3 = document.getElementById('historyView');
+    const v4 = document.getElementById('financialDashboardView');
+    if (v1) v1.style.display = 'none';
+    if (v2) v2.style.display = 'none';
+    if (v3) v3.style.display = 'none';
+    if (v4) v4.style.display = 'none';
 }
 
 function handleClosedStartNew() {
@@ -2667,7 +2672,9 @@ async function logoutAdmin() {
     }
     _clearAdminSession();
     showToast('Admin session locked', 'info');
-    if (document.getElementById('historyView') && document.getElementById('historyView').style.display !== 'none') {
+    if (document.getElementById('financialDashboardView') && document.getElementById('financialDashboardView').style.display !== 'none') {
+        showFormView();
+    } else if (document.getElementById('historyView') && document.getElementById('historyView').style.display !== 'none') {
         refreshHistory();
     }
 }
@@ -4259,3 +4266,623 @@ function showAlarmModalFromSw(sessionId) {
         }
     }
 }
+
+/* ═════════════════════════════════════════════════════════════════ */
+/* ── FINANCIAL DASHBOARD & ANALYTICS CONTROLLER                   ── */
+/* ═════════════════════════════════════════════════════════════════ */
+
+let _finChartTrend = null;
+let _finChartStreams = null;
+let _finChartPayments = null;
+let _finChartShiftComp = null;
+let _currentFinStats = null;
+let _finActivePreset = 'all';
+
+async function showFinancialsView() {
+    if (!isAdminLoggedIn()) {
+        const authed = await requireAdminAuth();
+        if (!authed) return;
+    }
+    hideAllViews();
+    const finView = document.getElementById('financialDashboardView');
+    if (finView) finView.style.display = 'block';
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('navFinancialsBtn');
+    if (btn) btn.classList.add('active');
+
+    _populateFinEmpSelect();
+    await loadFinancialStats();
+}
+
+function _populateFinEmpSelect() {
+    const sel = document.getElementById('finEmpFilter');
+    if (!sel) return;
+    const currentVal = sel.value || 'all';
+    sel.innerHTML = '<option value="all">All Employees</option>';
+    const employees = config.employees || (settingsData && settingsData.employees) || [];
+    employees.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e;
+        opt.textContent = e;
+        if (e === currentVal) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+function setFinancialPreset(preset) {
+    _finActivePreset = preset;
+    document.querySelectorAll('.fin-chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.preset === preset);
+    });
+
+    const startInput = document.getElementById('finStartDate');
+    const endInput = document.getElementById('finEndDate');
+    if (!startInput || !endInput) return;
+
+    const now = new Date();
+    const fmt = d => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+
+    if (preset === 'today') {
+        const todayStr = fmt(now);
+        startInput.value = todayStr;
+        endInput.value = todayStr;
+    } else if (preset === 'yesterday') {
+        const y = new Date();
+        y.setDate(y.getDate() - 1);
+        const yStr = fmt(y);
+        startInput.value = yStr;
+        endInput.value = yStr;
+    } else if (preset === '7d') {
+        const past = new Date();
+        past.setDate(past.getDate() - 6);
+        startInput.value = fmt(past);
+        endInput.value = fmt(now);
+    } else if (preset === '30d') {
+        const past = new Date();
+        past.setDate(past.getDate() - 29);
+        startInput.value = fmt(past);
+        endInput.value = fmt(now);
+    } else if (preset === 'this_month') {
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        startInput.value = fmt(firstDay);
+        endInput.value = fmt(now);
+    } else {
+        // all time
+        startInput.value = '';
+        endInput.value = '';
+    }
+
+    loadFinancialStats();
+}
+
+function onFinancialDateChange() {
+    _finActivePreset = 'custom';
+    document.querySelectorAll('.fin-chip').forEach(c => c.classList.remove('active'));
+    loadFinancialStats();
+}
+
+function refreshFinancials() {
+    loadFinancialStats();
+}
+
+async function loadFinancialStats() {
+    if (!isAdminLoggedIn()) {
+        const authed = await requireAdminAuth();
+        if (!authed) return;
+    }
+
+    const loading = document.getElementById('finLoading');
+    const content = document.getElementById('finContent');
+    if (loading) loading.style.display = 'block';
+    if (content) content.style.display = 'none';
+
+    const start = document.getElementById('finStartDate')?.value || '';
+    const end = document.getElementById('finEndDate')?.value || '';
+    const shift = document.getElementById('finShiftFilter')?.value || 'all';
+    const emp = document.getElementById('finEmpFilter')?.value || 'all';
+
+    const params = new URLSearchParams();
+    if (start) params.append('start_date', start);
+    if (end) params.append('end_date', end);
+    if (shift && shift !== 'all') params.append('shift_name', shift);
+    if (emp && emp !== 'all') params.append('employee_name', emp);
+
+    try {
+        const res = await fetch('/api/admin/financial-stats?' + params.toString(), {
+            headers: { ..._authHeaders() }
+        });
+        if (res.status === 401) {
+            await _handleAuthError();
+            return loadFinancialStats();
+        }
+        const data = await res.json();
+        if (data.success && data.stats) {
+            _currentFinStats = data.stats;
+            renderFinancialDashboard(data.stats);
+        } else {
+            showToast(data.error || 'Failed to load financial statistics', 'error');
+        }
+    } catch(e) {
+        showToast('Network error loading financial data', 'error');
+    } finally {
+        if (loading) loading.style.display = 'none';
+        if (content) content.style.display = 'block';
+    }
+}
+
+function renderFinancialDashboard(stats) {
+    if (!stats) return;
+
+    const kpis = stats.kpis || {};
+    const rev = stats.revenue_streams || {};
+    const pm = stats.payment_methods || {};
+
+    // 1. KPI Cards
+    const fmtPkr = n => `PKR ${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const fmtPkrZero = n => `PKR ${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+    document.getElementById('kpiGrossRevenue').textContent = fmtPkr(kpis.gross_revenue);
+    document.getElementById('kpiShiftsCount').textContent = `${kpis.total_shifts || 0} shifts analyzed`;
+    
+    document.getElementById('kpiTotalExpenses').textContent = fmtPkr(kpis.total_expenses);
+    document.getElementById('kpiAvgExp').textContent = `Avg: ${fmtPkrZero(kpis.avg_expenses_per_shift)} / shift`;
+
+    document.getElementById('kpiNetProfit').textContent = fmtPkr(kpis.net_profit);
+    document.getElementById('kpiAvgProfit').textContent = `Avg: ${fmtPkrZero(kpis.avg_profit_per_shift)} / shift`;
+
+    document.getElementById('kpiNetCollected').textContent = fmtPkr(kpis.net_collected);
+    const peak = kpis.peak_shift || {};
+    document.getElementById('kpiPeakShift').textContent = peak.revenue ? `Peak: ${fmtPkrZero(peak.revenue)} (${escHtml(peak.shift_name || '')} ${escHtml(peak.date || '')})` : 'Peak: None';
+
+    // 2. Packages Analysis Card
+    document.getElementById('finPkgTotalBadge').textContent = `${(rev.morning_pkg_count || 0) + (rev.nighter_pkg_count || 0)} booked`;
+    document.getElementById('finMorningVal').textContent = fmtPkr(rev.morning_pkg_total);
+    document.getElementById('finMorningCount').textContent = `${rev.morning_pkg_count || 0} morning bookings`;
+    document.getElementById('finNighterVal').textContent = fmtPkr(rev.nighter_pkg_total);
+    document.getElementById('finNighterCount').textContent = `${rev.nighter_pkg_count || 0} nighter bookings`;
+
+    const tierList = document.getElementById('finPkgTierList');
+    if (tierList) {
+        const tiers = stats.package_tiers || [];
+        if (!tiers.length) {
+            tierList.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No package bookings in this range</div>';
+        } else {
+            tierList.innerHTML = tiers.map(t => `
+                <div class="tier-item">
+                    <div>
+                        <span class="tier-name">${escHtml(t.tier)}</span>
+                        <span class="tier-count">${t.count} booked</span>
+                    </div>
+                    <span class="tier-amt">${fmtPkrZero(t.revenue)}</span>
+                </div>
+            `).join('');
+        }
+    }
+
+    // 3. PS5 Lounge Card
+    document.getElementById('finPS5TotalBadge').textContent = fmtPkr(rev.ps5_total);
+    document.getElementById('finPS5SessionsVal').textContent = `${rev.total_ps5_sessions || 0} sessions`;
+    document.getElementById('finPS5HoursVal').textContent = `${rev.total_ps5_hours || 0} hrs`;
+
+    const ps5Body = document.getElementById('finPS5ConsolesBody');
+    if (ps5Body) {
+        const consoles = stats.ps5_consoles || [];
+        if (!consoles.length) {
+            ps5Body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-dim);padding:14px;">No PS5 sessions recorded</td></tr>';
+        } else {
+            ps5Body.innerHTML = consoles.map(c => `
+                <tr>
+                    <td><strong>${escHtml(c.console)}</strong></td>
+                    <td>${c.sessions}</td>
+                    <td>${c.hours} hrs</td>
+                    <td style="color:var(--gold);font-weight:700;">${fmtPkrZero(c.revenue)}</td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    // 4. Cafeteria & Inventory Leaderboard
+    document.getElementById('finCafeTotalBadge').textContent = `Sale: ${fmtPkr(rev.cafeteria_sale)}`;
+    const invBody = document.getElementById('finInventoryLeaderboardBody');
+    if (invBody) {
+        const items = stats.inventory_leaderboard || [];
+        if (!items.length) {
+            invBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-dim);padding:14px;">No inventory sales recorded</td></tr>';
+        } else {
+            invBody.innerHTML = items.slice(0, 15).map((item, idx) => {
+                const rankClass = idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : 'rank-other'));
+                return `
+                    <tr>
+                        <td style="width:50px;"><span class="rank-badge ${rankClass}">#${idx + 1}</span></td>
+                        <td><strong>${escHtml(item.name)}</strong></td>
+                        <td style="color:var(--gold);font-weight:700;">${item.units_sold} units</td>
+                        <td style="color:var(--text-dim);">${item.restocked} units</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+
+    // 5. Expense Categories List
+    document.getElementById('finExpenseTotalBadge').textContent = fmtPkr(kpis.total_expenses);
+    const catList = document.getElementById('finExpenseCategoryList');
+    if (catList) {
+        const cats = stats.expense_categories || [];
+        if (!cats.length) {
+            catList.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No expenses in this period</div>';
+        } else {
+            const getTagClass = c => {
+                const lc = (c || '').toLowerCase();
+                if (lc.includes('stock')) return 'cat-stock';
+                if (lc.includes('topup')) return 'cat-topup';
+                if (lc.includes('food')) return 'cat-food';
+                if (lc.includes('clean')) return 'cat-cleaning';
+                if (lc.includes('maint')) return 'cat-maint';
+                return 'cat-other';
+            };
+            catList.innerHTML = cats.map(c => `
+                <div class="cat-row">
+                    <div class="cat-row-top">
+                        <span class="cat-tag ${getTagClass(c.category)}">${escHtml(c.category)}</span>
+                        <span>${fmtPkrZero(c.amount)} <small style="color:var(--text-dim)">(${c.percentage}%)</small></span>
+                    </div>
+                    <div class="cat-bar-track">
+                        <div class="cat-bar-fill" style="width:${Math.min(100, Math.max(2, c.percentage))}%;"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+    // 6. Operator / Employee Performance Table
+    const empBody = document.getElementById('finEmployeeMatrixBody');
+    if (empBody) {
+        const emps = stats.employee_performance || [];
+        if (!emps.length) {
+            empBody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-dim);padding:14px;">No employee records</td></tr>';
+        } else {
+            empBody.innerHTML = emps.map(e => `
+                <tr>
+                    <td><strong>👤 ${escHtml(e.name)}</strong></td>
+                    <td>${e.shifts_count}</td>
+                    <td style="color:var(--gold);font-weight:700;">${fmtPkrZero(e.gross_revenue)}</td>
+                    <td style="color:#fb7185;">${fmtPkrZero(e.expenses)}</td>
+                    <td style="color:#34d399;font-weight:700;">${fmtPkrZero(e.net_profit)}</td>
+                    <td>${fmtPkrZero(e.cash_collected)}</td>
+                    <td>${fmtPkrZero(e.online_collected)}</td>
+                    <td>${fmtPkrZero(e.pos_collected)}</td>
+                    <td style="color:var(--text-bright);font-weight:600;">${fmtPkrZero(e.avg_revenue_per_shift)}</td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    // 7. Itemized Expense Log (Top 50)
+    const expCountBadge = document.getElementById('finExpenseCountBadge');
+    if (expCountBadge) expCountBadge.textContent = `${(stats.expenses || []).length} total`;
+    const expBody = document.getElementById('finExpenseLogBody');
+    if (expBody) {
+        const exps = (stats.expenses || []).slice(0, 50);
+        if (!exps.length) {
+            expBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:14px;">No expenses recorded</td></tr>';
+        } else {
+            const getTagClass = c => {
+                const lc = (c || '').toLowerCase();
+                if (lc.includes('stock')) return 'cat-stock';
+                if (lc.includes('topup')) return 'cat-topup';
+                if (lc.includes('food')) return 'cat-food';
+                if (lc.includes('clean')) return 'cat-cleaning';
+                if (lc.includes('maint')) return 'cat-maint';
+                return 'cat-other';
+            };
+            expBody.innerHTML = exps.map(e => `
+                <tr>
+                    <td style="color:var(--text-dim);font-size:12px;">${escHtml(e.date)}</td>
+                    <td>${escHtml(e.shift)}</td>
+                    <td>${escHtml(e.employee)}</td>
+                    <td><span class="cat-tag ${getTagClass(e.category)}">${escHtml(e.category)}</span></td>
+                    <td><strong>${escHtml(e.description)}</strong></td>
+                    <td style="color:#fb7185;font-weight:700;">PKR ${parseFloat(e.amount).toFixed(2)}</td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    // 8. Render Chart.js Visuals
+    _renderFinancialCharts(stats);
+}
+
+function _renderFinancialCharts(stats) {
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded');
+        return;
+    }
+
+    // Common Chart defaults for Dark Theme
+    Chart.defaults.color = '#888888';
+    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.08)';
+    Chart.defaults.font.family = 'Montserrat, sans-serif';
+
+    // ── Chart 1: Daily Revenue & Profit Trend ──
+    const trendCtx = document.getElementById('finTrendChart')?.getContext('2d');
+    if (trendCtx) {
+        if (_finChartTrend) _finChartTrend.destroy();
+
+        const timeline = stats.timeline || [];
+        const labels = timeline.map(t => {
+            const dayPart = t.day ? ` (${t.day.slice(0,3)})` : '';
+            return t.date.slice(5) + dayPart;
+        });
+
+        _finChartTrend = new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Gross Revenue',
+                        data: timeline.map(t => t.gross_revenue),
+                        borderColor: '#daa520',
+                        backgroundColor: 'rgba(218, 165, 32, 0.1)',
+                        borderWidth: 2.5,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: timeline.length > 30 ? 0 : 3.5,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#ffd700'
+                    },
+                    {
+                        label: 'Net Profit',
+                        data: timeline.map(t => t.net_profit),
+                        borderColor: '#10b981',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        pointRadius: timeline.length > 30 ? 0 : 3,
+                        pointHoverRadius: 5
+                    },
+                    {
+                        label: 'Expenses',
+                        data: timeline.map(t => t.expenses),
+                        borderColor: '#f43f5e',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.8,
+                        borderDash: [4, 4],
+                        tension: 0.3,
+                        pointRadius: timeline.length > 30 ? 0 : 2.5,
+                        pointHoverRadius: 5
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, padding: 14 } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => ` ${ctx.dataset.label}: PKR ${Number(ctx.raw || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}`
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (v) => 'PKR ' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v)
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // ── Chart 2: Revenue Streams Breakdown (Doughnut) ──
+    const streamsCtx = document.getElementById('finStreamsChart')?.getContext('2d');
+    if (streamsCtx) {
+        if (_finChartStreams) _finChartStreams.destroy();
+
+        const rev = stats.revenue_streams || {};
+        const streamData = [
+            rev.morning_pkg_total || 0,
+            rev.nighter_pkg_total || 0,
+            rev.ps5_total || 0,
+            rev.cafeteria_sale || 0,
+            rev.topup_sale || 0
+        ];
+
+        _finChartStreams = new Chart(streamsCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['🌅 Morning Packages', '🌙 Nighter Packages', '🎮 PS5 Lounge', '☕ Cafeteria / Snacks', '💳 Topup Sales'],
+                datasets: [{
+                    data: streamData,
+                    backgroundColor: ['#f59e0b', '#8b5cf6', '#38bdf8', '#10b981', '#ec4899'],
+                    borderColor: '#141414',
+                    borderWidth: 2,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 12, padding: 12 } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const val = Number(ctx.raw || 0);
+                                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                                return ` ${ctx.label}: PKR ${val.toLocaleString('en-US', { minimumFractionDigits: 0 })} (${pct}%)`;
+                            }
+                        }
+                    }
+                },
+                cutout: '62%'
+            }
+        });
+    }
+
+    // ── Chart 3: Payment Methods Distribution (Doughnut) ──
+    const paymentsCtx = document.getElementById('finPaymentsChart')?.getContext('2d');
+    if (paymentsCtx) {
+        if (_finChartPayments) _finChartPayments.destroy();
+
+        const pm = stats.payment_methods || {};
+        _finChartPayments = new Chart(paymentsCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['💵 Cash in Hand', '📱 Online Transfers', '💳 POS Card Swipes'],
+                datasets: [{
+                    data: [pm.cash || 0, pm.online || 0, pm.pos || 0],
+                    backgroundColor: ['#10b981', '#3b82f6', '#f59e0b'],
+                    borderColor: '#141414',
+                    borderWidth: 2,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 12, padding: 14 } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                const val = Number(ctx.raw || 0);
+                                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                                return ` ${ctx.label}: PKR ${val.toLocaleString('en-US', { minimumFractionDigits: 0 })} (${pct}%)`;
+                            }
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+
+    // ── Chart 4: Shift Performance Comparison (Bar) ──
+    const shiftCompCtx = document.getElementById('finShiftCompChart')?.getContext('2d');
+    if (shiftCompCtx) {
+        if (_finChartShiftComp) _finChartShiftComp.destroy();
+
+        const shifts = stats.shift_comparison || [];
+        _finChartShiftComp = new Chart(shiftCompCtx, {
+            type: 'bar',
+            data: {
+                labels: shifts.map(s => s.shift_name),
+                datasets: [
+                    {
+                        label: 'Gross Revenue',
+                        data: shifts.map(s => s.gross_revenue),
+                        backgroundColor: '#daa520',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Net Profit',
+                        data: shifts.map(s => s.net_profit),
+                        backgroundColor: '#10b981',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Expenses',
+                        data: shifts.map(s => s.expenses),
+                        backgroundColor: '#f43f5e',
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, padding: 12 } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => ` ${ctx.dataset.label}: PKR ${Number(ctx.raw || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}`
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (v) => 'PKR ' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v)
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function exportFinancialsToCSV() {
+    if (!_currentFinStats) {
+        showToast('No financial data loaded to export', 'error');
+        return;
+    }
+
+    const s = _currentFinStats;
+    const kpis = s.kpis || {};
+    const rev = s.revenue_streams || {};
+    const pm = s.payment_methods || {};
+
+    let csv = '=== GAMING ZONE FINANCIAL REPORT ===\n';
+    csv += `Export Date,${new Date().toLocaleString()}\n`;
+    csv += `Total Shifts,${kpis.total_shifts || 0}\n`;
+    csv += `Gross Revenue,${kpis.gross_revenue || 0}\n`;
+    csv += `Total Expenses,${kpis.total_expenses || 0}\n`;
+    csv += `Net Profit,${kpis.net_profit || 0}\n`;
+    csv += `Net Cash Flow Collected,${kpis.net_collected || 0}\n`;
+    csv += `Cash Received,${pm.cash || 0}\n`;
+    csv += `Online Payments,${pm.online || 0}\n`;
+    csv += `Actual POS Amount,${pm.pos || 0}\n`;
+    csv += `Total Card Tax,${pm.tax || 0}\n\n`;
+
+    csv += '=== REVENUE STREAMS ===\n';
+    csv += `Morning Packages,${rev.morning_pkg_total || 0},(${rev.morning_pkg_count || 0} booked)\n`;
+    csv += `Nighter Packages,${rev.nighter_pkg_total || 0},(${rev.nighter_pkg_count || 0} booked)\n`;
+    csv += `PS5 Lounge Gaming,${rev.ps5_total || 0},(${rev.total_ps5_sessions || 0} sessions / ${rev.total_ps5_hours || 0} hrs)\n`;
+    csv += `Cafeteria & Snacks Sale,${rev.cafeteria_sale || 0}\n`;
+    csv += `Account Topup Sale,${rev.topup_sale || 0}\n\n`;
+
+    csv += '=== EMPLOYEE PERFORMANCE ===\n';
+    csv += 'Employee,Shifts,Gross Revenue,Expenses,Net Profit,Cash,Online,POS,Avg/Shift\n';
+    (s.employee_performance || []).forEach(e => {
+        csv += `"${e.name}",${e.shifts_count},${e.gross_revenue},${e.expenses},${e.net_profit},${e.cash_collected},${e.online_collected},${e.pos_collected},${e.avg_revenue_per_shift}\n`;
+    });
+    csv += '\n';
+
+    csv += '=== INVENTORY UNITS SOLD ===\n';
+    csv += 'Item Name,Units Sold,Restocked Total\n';
+    (s.inventory_leaderboard || []).forEach(i => {
+        csv += `"${i.name}",${i.units_sold},${i.restocked}\n`;
+    });
+    csv += '\n';
+
+    csv += '=== ITEMIZED EXPENSE LOG ===\n';
+    csv += 'Date,Shift,Employee,Category,Description,Amount (PKR)\n';
+    (s.expenses || []).forEach(e => {
+        csv += `"${e.date}","${e.shift}","${e.employee}","${e.category}","${(e.description || '').replace(/"/g, '""')}",${e.amount}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const todayStr = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `gaming_zone_financial_report_${todayStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Financial CSV exported successfully!', 'success');
+}
+
