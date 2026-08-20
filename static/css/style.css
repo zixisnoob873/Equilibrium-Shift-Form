@@ -776,23 +776,314 @@ select.cd-hidden { display: none !important; }
 .confirm-highlight { font-size:15px; color:var(--gold); font-weight:600; }
 .confirm-footer { justify-content:center; gap:10px; }
 
-/* === CLOSED SHIFT === */
-.closed-meta { display:flex; gap:var(--spacing-xl); flex-wrap:wrap; padding:8px 0; }
-.closed-meta-item { flex:1; min-width:130px; }
-.closed-meta-item label { display:block; font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
-.closed-meta-item span { font-size:14px; color:var(--text-bright); font-weight:500; }
-.closed-divider { height:1px; background:rgba(255,255,255,0.06); margin:14px 0; }
-.closed-totals { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:var(--spacing-md); }
-.closed-total-card { background:rgba(0,0,0,0.15); border-radius:var(--radius-sm); padding:10px 14px; border:1px solid var(--border); }
-.closed-total-card label { display:block; font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
-.ct-value { font-family:'Montserrat', sans-serif; font-size:16px; font-weight:600; color:var(--text-bright); }
-.ct-value.grand { font-size:22px; color:var(--gold-bright); }
-.grand-card { background:rgba(218,165,32,0.04); border-color:rgba(218,165,32,0.15); }
-.closed-details { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; }
-.closed-detail-col h4 { font-size:11px; font-weight:600; color:var(--gold); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; }
-.closed-list { font-size:12px; color:var(--text-dim); line-height:1.6; }
-.closed-list .item { padding:2px 0; }
-.closed-list .item .amt { color:var(--text-bright); font-weight:600; }
+/* === CLOSED SHIFT & AUDIT DETAILS === */
+.closed-view-card {
+    padding: var(--spacing-xl);
+}
+
+.closed-meta-badges {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.closed-pill-badge {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--text-bright);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.closed-pill-badge .pill-label {
+    color: var(--text-dim);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.closed-status-badge {
+    background: rgba(239, 68, 68, 0.12);
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.3);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-size: 11px;
+}
+
+.closed-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.06);
+    margin: 18px 0;
+}
+
+/* 3-Pillar Financial Grid */
+.closed-pillars-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+    align-items: stretch;
+}
+
+.pillar-card {
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: border-color 0.2s ease;
+}
+
+.pillar-card:hover {
+    border-color: rgba(218, 165, 32, 0.2);
+}
+
+.pillar-card-grand {
+    background: rgba(218, 165, 32, 0.04);
+    border-color: rgba(218, 165, 32, 0.25);
+    box-shadow: 0 0 20px rgba(218, 165, 32, 0.03);
+}
+
+.pillar-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.pillar-icon {
+    font-size: 18px;
+}
+
+.pillar-header h3 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-bright);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin: 0;
+}
+
+.pillar-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}
+
+.pillar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    padding: 2px 0;
+}
+
+.pillar-row .p-label {
+    color: var(--text-dim);
+}
+
+.pillar-row .p-val {
+    font-weight: 600;
+    color: var(--text-bright);
+    font-family: 'Montserrat', monospace;
+}
+
+.pillar-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    margin-top: 12px;
+    padding-top: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+}
+
+.pillar-total-val {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gold);
+}
+
+.pillar-total-row.grand-highlight {
+    border-top: 1px solid rgba(218, 165, 32, 0.3);
+    padding-top: 12px;
+}
+
+.pillar-total-row.grand-highlight .grand {
+    font-size: 20px;
+    color: var(--gold-bright);
+}
+
+/* 2x2 Detailed Grid */
+.closed-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: var(--spacing-lg);
+    align-items: start;
+}
+
+.closed-panel {
+    background: rgba(0, 0, 0, 0.14);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+}
+
+.closed-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.closed-panel-header h4 {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin: 0;
+}
+
+.closed-panel-icon {
+    font-size: 16px;
+}
+
+.closed-panel-body {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.pkg-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.pkg-detail-list, .ps5-detail-list, .expense-detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.detail-row-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 4px;
+    padding: 7px 10px;
+    font-size: 12px;
+}
+
+.detail-row-item .item-title {
+    color: var(--text-bright);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.detail-row-item .item-amount {
+    color: var(--gold);
+    font-weight: 600;
+    font-family: 'Montserrat', monospace;
+}
+
+/* Inventory Detail Table */
+.inv-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.inv-detail-table th {
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 10px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+}
+
+.inv-detail-table th:first-child {
+    text-align: left;
+}
+
+.inv-detail-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    text-align: right;
+    color: var(--text-bright);
+}
+
+.inv-detail-table td:first-child {
+    text-align: left;
+    font-weight: 500;
+}
+
+.inv-detail-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Gallery Section */
+.closed-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.gallery-card {
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+}
+
+.gallery-card-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+}
+
+.gallery-card-content img {
+    width: 100%;
+    max-height: 220px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.gallery-card-content img:hover {
+    transform: scale(1.01);
+    border-color: var(--gold);
+}
 
 /* === HISTORY === */
 .history-loading { text-align:center; padding:40px; color:var(--text-dim); font-size:14px; }

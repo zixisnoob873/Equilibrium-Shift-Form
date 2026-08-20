@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=24">
+    <link rel="stylesheet" href="/static/css/style.css?v=25">
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js" as="script">
     <script src="/static/js/chart.umd.min.js"></script>
 </head>
@@ -312,48 +312,203 @@
         </div>
 
         <!-- ═══════════════════════════════════════════════ -->
-        <!-- VIEW 2: Closed Shift Summary                   -->
+        <!-- VIEW 2: Closed Shift Summary / Audit Details     -->
         <!-- ═══════════════════════════════════════════════ -->
         <div id="closedShiftView" style="display:none;">
-            <section class="card section-full">
-                <div class="card-header">
-                    <h2><span class="accent-gold">◆</span> Shift Closed Successfully</h2>
-                    <span class="badge-sm" id="closedIdDisplay">ID: --</span>
-                </div>
-                <div class="closed-meta">
-                    <div class="closed-meta-item"><label>Employee</label><span id="cEmployee">--</span></div>
-                    <div class="closed-meta-item"><label>Date</label><span id="cDate">--</span></div>
-                    <div class="closed-meta-item"><label>Shift</label><span id="cShift">--</span></div>
-                    <div class="closed-meta-item"><label>Closed At</label><span id="cClosedAt">--</span></div>
-                </div>
-                <div class="closed-divider"></div>
-                <div class="closed-totals">
-                    <div class="closed-total-card"><label>Topup</label><span class="ct-value" id="cTopup">0.00</span></div>
-                    <div class="closed-total-card"><label>Morning Pkg</label><span class="ct-value" id="cMorning">0.00</span></div>
-                    <div class="closed-total-card"><label>Nighter Pkg</label><span class="ct-value" id="cNighter">0.00</span></div>
-                    <div class="closed-total-card"><label>PS5 Sale</label><span class="ct-value" id="cPS">0.00</span></div>
-                    <div class="closed-total-card"><label>Cafeteria</label><span class="ct-value" id="cCafeteria">0.00</span></div>
-                    <div class="closed-total-card"><label>Expenses</label><span class="ct-value expense-total" id="cExpenses">0.00</span></div>
-                    <div class="closed-total-card"><label>💰 Cash</label><span class="ct-value" id="cCash">0.00</span></div>
-                    <div class="closed-total-card"><label>📱 Online</label><span class="ct-value" id="cOnline">0.00</span></div>
-                    <div class="closed-total-card"><label>💰 POS Amount</label><span class="ct-value" id="cActualPos">0.00</span></div>
-                    <div class="closed-total-card"><label>🧾 TAX</label><span class="ct-value" id="cTotalTaxAmount">0.00</span></div>
-                    <div class="closed-total-card grand-card">
-                        <label>Grand Total</label>
-                        <span class="ct-value grand" id="cGrandTotal">PKR 0.00</span>
+            <section class="card section-full closed-view-card">
+                <!-- Header & Navigation -->
+                <div class="fin-header-top" style="margin-bottom:16px;">
+                    <div>
+                        <h1 class="fin-title" id="closedViewTitle"><span class="accent-gold">◆</span> Shift Closed Successfully</h1>
+                        <p class="fin-subtitle" id="closedViewSubtitle">Full financial breakdown, session ledger, inventory state, and verification audit</p>
+                    </div>
+                    <div class="fin-header-actions">
+                        <button class="btn btn-ghost" id="closedHeaderBackBtn" onclick="showHistoryView()" style="display:none;">← Back to History</button>
                     </div>
                 </div>
-                <div class="closed-divider"></div>
-                <div class="closed-details">
-                    <div class="closed-detail-col"><h4>📦 Morning Packages</h4><div id="cMorningPkgs" class="closed-list">None</div></div>
-                    <div class="closed-detail-col"><h4>🌙 Nighter Packages</h4><div id="cNighterPkgs" class="closed-list">None</div></div>
-                    <div class="closed-detail-col"><h4>🎮 PS5 Sessions</h4><div id="cPS5List" class="closed-list">None</div></div>
-                    <div class="closed-detail-col"><h4>📦 Inventory</h4><div id="cInventory" class="closed-list">None</div></div>
-                    <div class="closed-detail-col"><h4>💸 Expenses</h4><div id="cExpensesList" class="closed-list">None</div></div>
-                    <div class="closed-detail-col"><h4>📸 Pancafe Screenshot</h4><div id="cPancafeScreenshot" class="closed-list">None</div></div>
-                    <div class="closed-detail-col"><h4>🖼️ Form Screenshot</h4><div id="cFormScreenshot" class="closed-list">None</div></div>
+
+                <!-- Meta Badges Bar -->
+                <div class="closed-meta-badges">
+                    <span class="closed-pill-badge" id="closedIdBadge"><span class="pill-label">ID:</span> <span id="closedIdDisplay">--</span></span>
+                    <span class="closed-pill-badge" id="cEmployeePill"><span class="pill-label">Operator:</span> <span id="cEmployee">--</span></span>
+                    <span class="closed-pill-badge" id="cDatePill"><span class="pill-label">Date:</span> <span id="cDate">--</span></span>
+                    <span class="closed-pill-badge" id="cShiftPill"><span class="pill-label">Shift:</span> <span id="cShift">--</span></span>
+                    <span class="closed-pill-badge closed-status-badge" id="cStatusPill">Closed</span>
+                    <span class="closed-pill-badge" id="cClosedAtPill"><span class="pill-label">Closed At:</span> <span id="cClosedAt">--</span></span>
                 </div>
-                <div class="action-bar" style="margin-top:20px;" id="closedShiftActions">
+
+                <div class="closed-divider"></div>
+
+                <!-- 3-Pillar Financial Summary -->
+                <div class="closed-pillars-grid">
+                    <!-- Pillar 1: Revenue Streams -->
+                    <div class="pillar-card">
+                        <div class="pillar-header">
+                            <span class="pillar-icon">💰</span>
+                            <h3>Revenue Streams</h3>
+                        </div>
+                        <div class="pillar-body">
+                            <div class="pillar-row">
+                                <span class="p-label">Topup Sale</span>
+                                <span class="p-val" id="cTopup">0.00</span>
+                            </div>
+                            <div class="pillar-row">
+                                <span class="p-label">PC Packages</span>
+                                <span class="p-val" id="cPackagesTotal">0.00</span>
+                            </div>
+                            <div class="pillar-row">
+                                <span class="p-label">PS5 Lounge</span>
+                                <span class="p-val" id="cPS">0.00</span>
+                            </div>
+                            <div class="pillar-row">
+                                <span class="p-label">Cafeteria Items</span>
+                                <span class="p-val" id="cCafeteria">0.00</span>
+                            </div>
+                        </div>
+                        <div class="pillar-total-row">
+                            <span>Total Gross Revenue</span>
+                            <span class="pillar-total-val" id="cTotalGrossRevenue">PKR 0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Pillar 2: Payment Settlement -->
+                    <div class="pillar-card">
+                        <div class="pillar-header">
+                            <span class="pillar-icon">💳</span>
+                            <h3>Payment Breakdown</h3>
+                        </div>
+                        <div class="pillar-body">
+                            <div class="pillar-row">
+                                <span class="p-label">💵 Cash in Drawer</span>
+                                <span class="p-val" id="cCash">0.00</span>
+                            </div>
+                            <div class="pillar-row">
+                                <span class="p-label">📱 Online / Bank</span>
+                                <span class="p-val" id="cOnline">0.00</span>
+                            </div>
+                            <div class="pillar-row">
+                                <span class="p-label">💳 Actual POS</span>
+                                <span class="p-val" id="cActualPos">0.00</span>
+                            </div>
+                        </div>
+                        <div class="pillar-total-row">
+                            <span>Total Payments Received</span>
+                            <span class="pillar-total-val" id="cTotalPaymentCollected">PKR 0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Pillar 3: Net Reconciliation -->
+                    <div class="pillar-card pillar-card-grand">
+                        <div class="pillar-header">
+                            <span class="pillar-icon">📊</span>
+                            <h3>Net Settlement</h3>
+                        </div>
+                        <div class="pillar-body">
+                            <div class="pillar-row">
+                                <span class="p-label">Gross Revenue</span>
+                                <span class="p-val" id="cReconcileGross">0.00</span>
+                            </div>
+                            <div class="pillar-row">
+                                <span class="p-label" style="color:var(--danger);">Less Expenses</span>
+                                <span class="p-val" style="color:var(--danger);" id="cExpenses">0.00</span>
+                            </div>
+                            <div class="pillar-row">
+                                <span class="p-label">TAX Amount</span>
+                                <span class="p-val" id="cTotalTaxAmount">0.00</span>
+                            </div>
+                        </div>
+                        <div class="pillar-total-row grand-highlight">
+                            <span>Grand Total Net</span>
+                            <span class="ct-value grand" id="cGrandTotal">PKR 0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="closed-divider"></div>
+
+                <!-- 2x2 Detailed Breakdown Grid -->
+                <div class="closed-detail-grid">
+                    <!-- 1. PS5 Lounge Sessions -->
+                    <div class="closed-panel">
+                        <div class="closed-panel-header">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="closed-panel-icon">🎮</span>
+                                <h4>PS5 Lounge Sessions</h4>
+                            </div>
+                            <span class="badge-sm" id="cPS5CountBadge">0 sessions</span>
+                        </div>
+                        <div class="closed-panel-body" id="cPS5List">None</div>
+                    </div>
+
+                    <!-- 2. PC Packages Breakdown -->
+                    <div class="closed-panel">
+                        <div class="closed-panel-header">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="closed-panel-icon">📦</span>
+                                <h4>PC Packages Breakdown</h4>
+                            </div>
+                            <span class="badge-sm" id="cPkgCountBadge">0 packages</span>
+                        </div>
+                        <div class="closed-panel-body">
+                            <div style="margin-bottom:12px;">
+                                <div class="pkg-section-title">☀️ Morning Packages</div>
+                                <div id="cMorningPkgs" class="pkg-detail-list">None</div>
+                            </div>
+                            <div>
+                                <div class="pkg-section-title">🌙 Nighter Packages</div>
+                                <div id="cNighterPkgs" class="pkg-detail-list">None</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Cafeteria Inventory Stock Table -->
+                    <div class="closed-panel">
+                        <div class="closed-panel-header">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="closed-panel-icon">🥤</span>
+                                <h4>Cafeteria Stock Reconciliation</h4>
+                            </div>
+                        </div>
+                        <div class="closed-panel-body" style="padding:0;" id="cInventory">None</div>
+                    </div>
+
+                    <!-- 4. Shift Expenses & Deductions -->
+                    <div class="closed-panel">
+                        <div class="closed-panel-header">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="closed-panel-icon">💸</span>
+                                <h4>Shift Expenses & Deductions</h4>
+                            </div>
+                            <span class="badge-sm" id="cExpenseCountBadge">0 items</span>
+                        </div>
+                        <div class="closed-panel-body" id="cExpensesList">None</div>
+                    </div>
+                </div>
+
+                <div class="closed-divider"></div>
+
+                <!-- Proof Verification Gallery -->
+                <div class="closed-gallery-section">
+                    <div class="closed-panel-header" style="margin-bottom:12px;">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span class="closed-panel-icon">📸</span>
+                            <h4>Verification & Proof Gallery</h4>
+                        </div>
+                    </div>
+                    <div class="closed-gallery-grid">
+                        <div class="gallery-card">
+                            <div class="gallery-card-label">📷 Pancafe Server Screenshot</div>
+                            <div id="cPancafeScreenshot" class="gallery-card-content">None</div>
+                        </div>
+                        <div class="gallery-card">
+                            <div class="gallery-card-label">🖼️ Shift Form Snapshot</div>
+                            <div id="cFormScreenshot" class="gallery-card-content">None</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Bar -->
+                <div class="action-bar" style="margin-top:24px;" id="closedShiftActions">
                     <button class="btn btn-secondary btn-lg" id="closedStartNewBtn" onclick="handleClosedStartNew()">
                         <span class="btn-icon">🚀</span> Start New Shift
                     </button>
@@ -1045,7 +1200,7 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js"></script>
-    <script src="/static/js/app.js?v=51"></script>
+    <script src="/static/js/app.js?v=52"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

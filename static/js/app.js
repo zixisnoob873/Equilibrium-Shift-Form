@@ -2192,42 +2192,195 @@ function showConfirmModal() {
 }
 
 function renderClosedShiftView(s) {
-    document.getElementById('closedIdDisplay').textContent = `ID: ${s.shift_id||'--'}`;
-    document.getElementById('cEmployee').textContent = s.employee_name||'--';
-    document.getElementById('cDate').textContent = `${s.date||'--'} | ${s.day||'--'}`;
-    document.getElementById('cShift').textContent = `${s.shift_name||'--'} (${s.shift_timing||'--'})`;
-    document.getElementById('cClosedAt').textContent = s.closed_at||'--';
-    document.getElementById('cTopup').textContent = (s.topup_sale||0).toFixed(2);
-    document.getElementById('cMorning').textContent = (s.morning_pkg_total||0).toFixed(2);
-    document.getElementById('cNighter').textContent = (s.nighter_pkg_total||0).toFixed(2);
-    document.getElementById('cPS').textContent = (s.ps5_total||0).toFixed(2);
-    document.getElementById('cCafeteria').textContent = (s.cafeteria_sale||0).toFixed(2);
-    document.getElementById('cExpenses').textContent = (s.total_expenses||0).toFixed(2);
-    document.getElementById('cCash').textContent = (s.cash_received||0).toFixed(2);
-    document.getElementById('cOnline').textContent = (s.online_payments||0).toFixed(2);
-    document.getElementById('cActualPos').textContent = (s.actual_pos_amount||0).toFixed(2);
-    document.getElementById('cTotalTaxAmount').textContent = (s.total_tax_amount||0).toFixed(2);
-    document.getElementById('cGrandTotal').textContent = `PKR ${(s.grand_total||0).toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    // 1. Dynamic Titles & Context Navigation
+    const titleEl = document.getElementById('closedViewTitle');
+    const subtitleEl = document.getElementById('closedViewSubtitle');
+    const headerBackBtn = document.getElementById('closedHeaderBackBtn');
+    const backBtn = document.getElementById('closedBackHistoryBtn');
+    const startNewBtn = document.getElementById('closedStartNewBtn');
 
-    const mk = (items, fn) => items && items.length ? items.map(fn).join('') : '<span style="color:var(--text-dim)">None</span>';
-    document.getElementById('cMorningPkgs').innerHTML = mk(s.morning_packages, p => `<div class="item">${escHtml(p[0])} — <span class="amt">PKR ${parseFloat(p[1]).toFixed(0)}</span></div>`);
-    document.getElementById('cNighterPkgs').innerHTML = mk(s.nighter_packages, p => `<div class="item">${escHtml(p[0])} — <span class="amt">PKR ${parseFloat(p[1]).toFixed(0)}</span></div>`);
-    document.getElementById('cPS5List').innerHTML = mk(s.ps5_sessions, p => {
-        const ext = p[6] ? ' <span class="ext-badge">⚡ EXT</span>' : '';
-        return `<div class="item">${escHtml(p[0])} (${p[1]}ctrl) ${escHtml(p[2])} - ${p[5]||1}h${ext} — <span class="amt">PKR ${parseFloat(p[4]).toFixed(0)}</span></div>`;
-    });
-    const invHtml = (s.inventory||[]).map(i => `<div class="item">${escHtml(i[0])}: opening=${i[1]}, restock=${i[2]||0}, closing=${i[3]||0}</div>`).join('');
-    document.getElementById('cInventory').innerHTML = invHtml || '<span style="color:var(--text-dim)">None</span>';
-    document.getElementById('cExpensesList').innerHTML = mk(s.expenses, e => `<div class="item">${escHtml(e[0])} — <span class="amt">PKR ${parseFloat(e[1]).toFixed(0)}</span></div>`);
+    if (viewingHistoryShift) {
+        if (titleEl) titleEl.innerHTML = '<span class="accent-gold">📜</span> Shift Audit & Summary Record';
+        if (subtitleEl) subtitleEl.textContent = `Historical record for shift ${s.shift_id || ''} closed by ${s.employee_name || '--'}`;
+        if (headerBackBtn) headerBackBtn.style.display = 'inline-flex';
+        if (backBtn) backBtn.style.display = 'inline-flex';
+        if (startNewBtn) startNewBtn.style.display = 'none';
+    } else {
+        if (titleEl) titleEl.innerHTML = '<span class="accent-gold">◆</span> Shift Closed Successfully';
+        if (subtitleEl) subtitleEl.textContent = 'Full financial breakdown, session ledger, inventory state, and verification audit';
+        if (headerBackBtn) headerBackBtn.style.display = 'none';
+        if (backBtn) backBtn.style.display = 'none';
+        if (startNewBtn) startNewBtn.style.display = 'inline-flex';
+    }
+
+    // 2. Metadata Pills
+    document.getElementById('closedIdDisplay').textContent = s.shift_id || '--';
+    document.getElementById('cEmployee').textContent = s.employee_name || '--';
+    document.getElementById('cDate').textContent = `${s.date || '--'} (${s.day || '--'})`;
+    document.getElementById('cShift').textContent = `${s.shift_name || '--'} (${s.shift_timing || '--'})`;
+    document.getElementById('cClosedAt').textContent = s.closed_at || '--';
+    const statusPill = document.getElementById('cStatusPill');
+    if (statusPill) {
+        statusPill.textContent = s.status ? s.status.toUpperCase() : 'CLOSED';
+        statusPill.className = `closed-pill-badge closed-status-badge ${s.status || 'closed'}`;
+    }
+
+    // 3. Financial Computations
+    const topup = s.topup_sale || 0;
+    const morningPkgTotal = (s.morning_pkg_total !== undefined) ? s.morning_pkg_total : ((s.morning_packages || []).reduce((acc, p) => acc + (parseFloat(p[1]) || 0), 0));
+    const nighterPkgTotal = (s.nighter_pkg_total !== undefined) ? s.nighter_pkg_total : ((s.nighter_packages || []).reduce((acc, p) => acc + (parseFloat(p[1]) || 0), 0));
+    const packagesTotal = morningPkgTotal + nighterPkgTotal;
+    const ps5Total = s.ps5_total || 0;
+    const cafeTotal = s.cafeteria_sale || 0;
+    const grossTotal = (s.total !== undefined) ? s.total : (topup + packagesTotal + ps5Total + cafeTotal);
+
+    const cash = s.cash_received || 0;
+    const online = s.online_payments || 0;
+    const pos = s.actual_pos_amount || 0;
+    const paymentCollected = (s.total_payment_received !== undefined) ? s.total_payment_received : (cash + online + pos);
+
+    const expenses = s.total_expenses || 0;
+    const tax = s.total_tax_amount || 0;
+    const grandTotal = s.grand_total || (grossTotal - expenses);
+
+    // Pillar 1: Revenue Streams
+    document.getElementById('cTopup').textContent = `PKR ${topup.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+    const pkgTotalEl = document.getElementById('cPackagesTotal');
+    if (pkgTotalEl) pkgTotalEl.textContent = `PKR ${packagesTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+    document.getElementById('cPS').textContent = `PKR ${ps5Total.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+    document.getElementById('cCafeteria').textContent = `PKR ${cafeTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+    const grossEl = document.getElementById('cTotalGrossRevenue');
+    if (grossEl) grossEl.textContent = `PKR ${grossTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+    // Pillar 2: Payment Breakdown
+    document.getElementById('cCash').textContent = `PKR ${cash.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+    document.getElementById('cOnline').textContent = `PKR ${online.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+    document.getElementById('cActualPos').textContent = `PKR ${pos.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+    const collectedEl = document.getElementById('cTotalPaymentCollected');
+    if (collectedEl) collectedEl.textContent = `PKR ${paymentCollected.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+    // Pillar 3: Net Settlement
+    const recGrossEl = document.getElementById('cReconcileGross');
+    if (recGrossEl) recGrossEl.textContent = `PKR ${grossTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+    document.getElementById('cExpenses').textContent = `-PKR ${expenses.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+    document.getElementById('cTotalTaxAmount').textContent = `PKR ${tax.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+    document.getElementById('cGrandTotal').textContent = `PKR ${grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+    // 4. Detailed Sections
+    // A. PS5 Lounge Sessions
+    const ps5Count = (s.ps5_sessions || []).length;
+    const ps5Badge = document.getElementById('cPS5CountBadge');
+    if (ps5Badge) ps5Badge.textContent = `${ps5Count} session${ps5Count === 1 ? '' : 's'}`;
+    const ps5ListEl = document.getElementById('cPS5List');
+    if (ps5ListEl) {
+        if (!ps5Count) {
+            ps5ListEl.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No PS5 lounge sessions recorded.</div>';
+        } else {
+            ps5ListEl.innerHTML = `<div class="ps5-detail-list">` + s.ps5_sessions.map(p => {
+                const ext = p[6] ? `<span class="ext-badge" style="font-size:10px;padding:1px 5px;">⚡ EXT</span>` : '';
+                return `
+                <div class="detail-row-item">
+                    <div class="item-title">
+                        <span>🎮 <strong>${escHtml(p[0])}</strong></span>
+                        <span class="badge-sm" style="font-size:10px;padding:2px 6px;">${p[1]} Ctrl</span>
+                        <span style="color:var(--text-dim);font-size:11px;">${escHtml(p[2] || '--')} (${p[5] || 1}h)</span>
+                        ${ext}
+                    </div>
+                    <div class="item-amount">PKR ${parseFloat(p[4] || 0).toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
+                </div>`;
+            }).join('') + `</div>`;
+        }
+    }
+
+    // B. PC Packages Breakdown
+    const mPkgs = s.morning_packages || [];
+    const nPkgs = s.nighter_packages || [];
+    const totalPkgs = mPkgs.length + nPkgs.length;
+    const pkgBadge = document.getElementById('cPkgCountBadge');
+    if (pkgBadge) pkgBadge.textContent = `${totalPkgs} package${totalPkgs === 1 ? '' : 's'}`;
+
+    const renderPkgList = (list) => {
+        if (!list || !list.length) return '<div style="color:var(--text-dim);font-size:11px;padding:4px 0;">None</div>';
+        return `<div class="pkg-detail-list">` + list.map(p => `
+            <div class="detail-row-item">
+                <div class="item-title">📦 ${escHtml(p[0])}</div>
+                <div class="item-amount">PKR ${parseFloat(p[1] || 0).toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
+            </div>
+        `).join('') + `</div>`;
+    };
+    document.getElementById('cMorningPkgs').innerHTML = renderPkgList(mPkgs);
+    document.getElementById('cNighterPkgs').innerHTML = renderPkgList(nPkgs);
+
+    // C. Cafeteria Inventory Stock Table
+    const invList = s.inventory || [];
+    const invEl = document.getElementById('cInventory');
+    if (invEl) {
+        if (!invList.length) {
+            invEl.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:12px 16px;">No inventory tracked for this shift.</div>';
+        } else {
+            let invHtml = `
+            <table class="inv-detail-table">
+                <thead>
+                    <tr>
+                        <th>Item Name</th>
+                        <th>Opening</th>
+                        <th>Restock</th>
+                        <th>Sold</th>
+                        <th>Closing</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            invList.forEach(i => {
+                const opening = parseInt(i[1], 10) || 0;
+                const restock = parseInt(i[2], 10) || 0;
+                const closing = parseInt(i[3], 10) || 0;
+                const sold = Math.max(0, opening + restock - closing);
+                invHtml += `
+                    <tr>
+                        <td>🥤 ${escHtml(i[0])}</td>
+                        <td>${opening}</td>
+                        <td style="color:${restock > 0 ? 'var(--accent)' : 'inherit'};">+${restock}</td>
+                        <td style="color:${sold > 0 ? 'var(--gold)' : 'inherit'};"><strong>${sold}</strong></td>
+                        <td>${closing}</td>
+                    </tr>`;
+            });
+            invHtml += `</tbody></table>`;
+            invEl.innerHTML = invHtml;
+        }
+    }
+
+    // D. Shift Expenses
+    const expList = s.expenses || [];
+    const expBadge = document.getElementById('cExpenseCountBadge');
+    if (expBadge) expBadge.textContent = `${expList.length} item${expList.length === 1 ? '' : 's'}`;
+    const expListEl = document.getElementById('cExpensesList');
+    if (expListEl) {
+        if (!expList.length) {
+            expListEl.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No shift expenses recorded.</div>';
+        } else {
+            expListEl.innerHTML = `<div class="expense-detail-list">` + expList.map(e => `
+                <div class="detail-row-item">
+                    <div class="item-title">🏷️ ${escHtml(e[0])}</div>
+                    <div class="item-amount" style="color:var(--danger);">PKR ${parseFloat(e[1] || 0).toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
+                </div>
+            `).join('') + `</div>`;
+        }
+    }
+
+    // 5. Verification Gallery
     const pancafeEl = document.getElementById('cPancafeScreenshot');
     if (pancafeEl) {
         const pf = s.pancafe_screenshot_filename;
-        pancafeEl.innerHTML = pf ? `<a href="/uploads/${encodeURIComponent(pf)}" target="_blank"><img src="/uploads/${encodeURIComponent(pf)}" alt="Pancafe Screenshot" style="max-width:100%;max-height:200px;border-radius:var(--radius-sm);border:1px solid var(--border);"></a>` : '<span style="color:var(--text-dim)">None</span>';
+        pancafeEl.innerHTML = pf
+            ? `<a href="/uploads/${encodeURIComponent(pf)}" target="_blank" title="Click to open original full-size image"><img src="/uploads/${encodeURIComponent(pf)}" alt="Pancafe Server Screenshot"></a>`
+            : '<div style="color:var(--text-dim);font-size:12px;padding:24px;text-align:center;">No Pancafe screenshot uploaded</div>';
     }
     const formSsEl = document.getElementById('cFormScreenshot');
     if (formSsEl) {
         const ff = s.form_screenshot_filename;
-        formSsEl.innerHTML = ff ? `<a href="/uploads/${encodeURIComponent(ff)}" target="_blank"><img src="/uploads/${encodeURIComponent(ff)}" alt="Form Screenshot" style="max-width:100%;max-height:200px;border-radius:var(--radius-sm);border:1px solid var(--border);"></a>` : '<span style="color:var(--text-dim)">None</span>';
+        formSsEl.innerHTML = ff
+            ? `<a href="/uploads/${encodeURIComponent(ff)}" target="_blank" title="Click to open original full-size image"><img src="/uploads/${encodeURIComponent(ff)}" alt="Shift Form Snapshot"></a>`
+            : '<div style="color:var(--text-dim);font-size:12px;padding:24px;text-align:center;">No form screenshot uploaded</div>';
     }
 }
 
