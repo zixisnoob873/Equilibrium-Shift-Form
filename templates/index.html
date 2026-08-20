@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,11 +8,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css?v=26">
-    <link rel="preload" href="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js" as="script">
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js"
+        as="script">
     <script src="/static/js/chart.umd.min.js"></script>
 </head>
+
 <body>
     <header class="header">
         <div class="header-content">
@@ -28,7 +32,8 @@
             <div class="header-status">
                 <div class="admin-header-badge" id="adminHeaderBadge" style="display:none;">
                     <span class="admin-badge-name" id="adminHeaderName">👑 Admin</span>
-                    <button class="btn-admin-lock" id="adminHeaderLockBtn" onclick="logoutAdmin()" title="Lock admin session">🔒 Lock</button>
+                    <button class="btn-admin-lock" id="adminHeaderLockBtn" onclick="logoutAdmin()"
+                        title="Lock admin session">🔒 Lock</button>
                 </div>
                 <div class="status-badge" id="statusBadge">
                     <span class="status-dot"></span>
@@ -82,221 +87,262 @@
 
                 <div id="formContent" style="display:none;">
 
-                <section class="card section-full">
-                    <div class="card-header">
-                        <h2><span class="accent-gold">◈</span> Package Tracker</h2>
-                        <div class="card-actions">
-                            <button class="btn btn-sm btn-ghost" onclick="openBookingModal('morning')">+ Morning</button>
-                            <button class="btn btn-sm btn-ghost" onclick="openBookingModal('nighter')">+ Nighter</button>
-                        </div>
-                    </div>
-                    <div class="package-grid">
-                        <div class="package-col">
-                            <h3 class="col-title">🌅 Morning Packages</h3>
-                            <div class="table-wrap">
-                                <table class="data-table">
-                                    <thead><tr><th>PC Name</th><th>Amount (PKR)</th><th></th></tr></thead>
-                                    <tbody id="morningBody"></tbody>
-                                </table>
-                            </div>
-                            <div class="col-total">Total: <span class="total-val" id="morningTotal">0.00</span></div>
-                        </div>
-                        <div class="package-col">
-                            <h3 class="col-title">🌙 Nighter Packages</h3>
-                            <div class="table-wrap">
-                                <table class="data-table">
-                                    <thead><tr><th>PC Name</th><th>Amount (PKR)</th><th></th></tr></thead>
-                                    <tbody id="nighterBody"></tbody>
-                                </table>
-                            </div>
-                            <div class="col-total">Total: <span class="total-val" id="nighterTotal">0.00</span></div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="card">
-                    <div class="card-header">
-                        <h2><span class="accent-gold">◈</span> PS5 Sessions</h2>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-ghost" onclick="addPS5Row()">+ Add Session</button>
-                            <button class="btn btn-sm btn-ghost ext-btn" onclick="addPS5ExtendedRow()">⚡ + Add Extended Session</button>
-                        </div>
-                    </div>
-                    <div class="table-wrap">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>PS Number</th>
-                                <th>Controllers</th>
-                                    <th>Start Time</th>
-                                    <th>Duration (hrs)</th>
-                                    <th>End Time</th>
-                                    <th>Amount</th>
-                                    <th style="width:50px"></th>
-                                    <th style="width:30px"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="ps5Body"></tbody>
-                        </table>
-                    </div>
-                    <div class="col-total">Total: <span class="total-val" id="ps5Total">0.00</span></div>
-                </section>
-
-                <div class="split-row">
-                    <section class="card">
+                    <section class="card section-full">
                         <div class="card-header">
-                            <h2><span class="accent-gold">◈</span> Cafeteria Inventory</h2>
-                            <span class="badge-sm">End of Shift Count</span>
+                            <h2><span class="accent-gold">◈</span> Package Tracker</h2>
+                            <div class="card-actions">
+                                <button class="btn btn-sm btn-ghost" onclick="openBookingModal('morning')">+
+                                    Morning</button>
+                                <button class="btn btn-sm btn-ghost" onclick="openBookingModal('nighter')">+
+                                    Nighter</button>
+                            </div>
                         </div>
-                        <div class="table-wrap">
-                            <table class="data-table" id="invTable">
-                                <thead>
-                                    <tr>
-                                        <th>Item</th>
-                                        <th>Opening Stock</th>
-                                        <th>Restock</th>
-                                        <th>Sold</th>
-                                        <th>Closing</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="inventoryBody"></tbody>
-                            </table>
+                        <div class="package-grid">
+                            <div class="package-col">
+                                <h3 class="col-title">🌅 Morning Packages</h3>
+                                <div class="table-wrap">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>PC Name</th>
+                                                <th>Amount (PKR)</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="morningBody"></tbody>
+                                    </table>
+                                </div>
+                                <div class="col-total">Total: <span class="total-val" id="morningTotal">0.00</span>
+                                </div>
+                            </div>
+                            <div class="package-col">
+                                <h3 class="col-title">🌙 Nighter Packages</h3>
+                                <div class="table-wrap">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>PC Name</th>
+                                                <th>Amount (PKR)</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="nighterBody"></tbody>
+                                    </table>
+                                </div>
+                                <div class="col-total">Total: <span class="total-val" id="nighterTotal">0.00</span>
+                                </div>
+                            </div>
                         </div>
                     </section>
 
                     <section class="card">
                         <div class="card-header">
-                            <h2><span class="accent-gold">◈</span> Expenses & Refunds</h2>
-                            <button class="btn btn-sm btn-ghost" onclick="addExpenseRow()">+ Add</button>
+                            <h2><span class="accent-gold">◈</span> PS5 Sessions</h2>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-ghost" onclick="addPS5Row()">+ Add Session</button>
+                                <button class="btn btn-sm btn-ghost ext-btn" onclick="addPS5ExtendedRow()">⚡ + Add
+                                    Extended Session</button>
+                            </div>
                         </div>
                         <div class="table-wrap">
                             <table class="data-table">
-                                <thead><tr><th>Description</th><th>Amount (PKR)</th><th></th></tr></thead>
-                                <tbody id="expenseBody"></tbody>
+                                <thead>
+                                    <tr>
+                                        <th>PS Number</th>
+                                        <th>Controllers</th>
+                                        <th>Start Time</th>
+                                        <th>Duration (hrs)</th>
+                                        <th>End Time</th>
+                                        <th>Amount</th>
+                                        <th style="width:50px"></th>
+                                        <th style="width:30px"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ps5Body"></tbody>
                             </table>
                         </div>
-                        <div class="col-total">Total: <span class="total-val expense-total" id="expenseTotal">0.00</span></div>
+                        <div class="col-total">Total: <span class="total-val" id="ps5Total">0.00</span></div>
                     </section>
-                </div>
 
-                <section class="card section-full summary-card">
-                    <div class="card-header">
-                        <h2><span class="accent-gold">◆</span> Financial Summary</h2>
+                    <div class="split-row">
+                        <section class="card">
+                            <div class="card-header">
+                                <h2><span class="accent-gold">◈</span> Cafeteria Inventory</h2>
+                                <span class="badge-sm">End of Shift Count</span>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table" id="invTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Item</th>
+                                            <th>Opening Stock</th>
+                                            <th>Restock</th>
+                                            <th>Sold</th>
+                                            <th>Closing</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="inventoryBody"></tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section class="card">
+                            <div class="card-header">
+                                <h2><span class="accent-gold">◈</span> Expenses & Refunds</h2>
+                                <button class="btn btn-sm btn-ghost" onclick="addExpenseRow()">+ Add</button>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Description</th>
+                                            <th>Amount (PKR)</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="expenseBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="col-total">Total: <span class="total-val expense-total"
+                                    id="expenseTotal">0.00</span></div>
+                        </section>
                     </div>
-                    <div class="summary-grid">
-                        <div class="summary-item manual">
-                            <label>Total Topup Sale</label>
-                            <div class="input-group">
-                                <span class="currency-prefix">PKR</span>
-                                <input type="number" class="input-glow summary-input" id="topupInput" step="0.01" min="0" value="0" oninput="recalcGrandTotal()">
-                            </div>
-                        </div>
-                        <div class="summary-item auto">
-                            <label>Morning Package Sale</label>
-                            <div class="summary-value" id="summaryMorning">0.00</div>
-                        </div>
-                        <div class="summary-item auto">
-                            <label>Nighter Package Sale</label>
-                            <div class="summary-value" id="summaryNighter">0.00</div>
-                        </div>
-                        <div class="summary-item auto">
-                            <label>PS5 Sale</label>
-                            <div class="summary-value" id="summaryPS">0.00</div>
-                        </div>
-                        <div class="summary-item manual">
-                            <label>Cafeteria Sale</label>
-                            <div class="input-group">
-                                <span class="currency-prefix">PKR</span>
-                                <input type="number" class="input-glow summary-input" id="cafeteriaInput" step="0.01" min="0" value="0" oninput="recalcGrandTotal()">
-                            </div>
-                        </div>
-                        <div class="summary-item auto">
-                            <label>Total Expenses</label>
-                            <div class="summary-value expense-total" id="summaryExpenses">0.00</div>
-                        </div>
 
-                        <div class="summary-item manual payment-field">
-                            <label>💵 Cash Received</label>
-                            <div class="input-group">
-                                <span class="currency-prefix">PKR</span>
-                                <input type="number" class="input-glow summary-input payment-input" id="cashInput" step="0.01" min="0" value="0" oninput="recalcGrandTotal()">
-                            </div>
+                    <section class="card section-full summary-card">
+                        <div class="card-header">
+                            <h2><span class="accent-gold">◆</span> Financial Summary</h2>
                         </div>
-                        <div class="summary-item manual payment-field">
-                            <label>📱 Online Payments</label>
-                            <div class="input-group">
-                                <span class="currency-prefix">PKR</span>
-                                <input type="number" class="input-glow summary-input payment-input" id="onlineInput" step="0.01" min="0" value="0" oninput="recalcGrandTotal()">
-                            </div>
-                        </div>
-                        <div class="summary-item auto payment-match-box" id="paymentMatchStatus" style="grid-row: span 2;">
-                            <label>Payment Match</label>
-                            <div id="paymentStatusContainer">
-                                <div id="paymentStatusHeader" class="status-header">
-                                    <span id="paymentStatusIcon">⏳</span>
-                                    <span id="paymentStatusLabel">Waiting</span>
-                                </div>
-                                <div class="payment-divider"></div>
-                                <div id="paymentStatusDiff" class="status-diff">Enter values to match Grand Total</div>
-                                <div class="payment-breakdown" id="paymentBreakdown">
-                                    <div class="breakdown-row">
-                                        <span class="breakdown-label">Cash</span>
-                                        <div class="breakdown-track"><div class="breakdown-fill" id="cashBar"></div></div>
-                                        <span class="breakdown-value" id="cashDisplay">PKR 0</span>
-                                    </div>
-                                    <div class="breakdown-row">
-                                        <span class="breakdown-label">Online</span>
-                                        <div class="breakdown-track"><div class="breakdown-fill" id="onlineBar"></div></div>
-                                        <span class="breakdown-value" id="onlineDisplay">PKR 0</span>
-                                    </div>
-                                    <div class="breakdown-row">
-                                        <span class="breakdown-label">POS</span>
-                                        <div class="breakdown-track"><div class="breakdown-fill" id="posBar"></div></div>
-                                        <span class="breakdown-value" id="posDisplay">PKR 0</span>
-                                    </div>
+                        <div class="summary-grid">
+                            <div class="summary-item manual">
+                                <label>Total Topup Sale</label>
+                                <div class="input-group">
+                                    <span class="currency-prefix">PKR</span>
+                                    <input type="number" class="input-glow summary-input" id="topupInput" step="0.01"
+                                        min="0" value="0" oninput="recalcGrandTotal()">
                                 </div>
                             </div>
-                        </div>
+                            <div class="summary-item auto">
+                                <label>Morning Package Sale</label>
+                                <div class="summary-value" id="summaryMorning">0.00</div>
+                            </div>
+                            <div class="summary-item auto">
+                                <label>Nighter Package Sale</label>
+                                <div class="summary-value" id="summaryNighter">0.00</div>
+                            </div>
+                            <div class="summary-item auto">
+                                <label>PS5 Sale</label>
+                                <div class="summary-value" id="summaryPS">0.00</div>
+                            </div>
+                            <div class="summary-item manual">
+                                <label>Cafeteria Sale</label>
+                                <div class="input-group">
+                                    <span class="currency-prefix">PKR</span>
+                                    <input type="number" class="input-glow summary-input" id="cafeteriaInput"
+                                        step="0.01" min="0" value="0" oninput="recalcGrandTotal()">
+                                </div>
+                            </div>
+                            <div class="summary-item auto">
+                                <label>Total Expenses</label>
+                                <div class="summary-value expense-total" id="summaryExpenses">0.00</div>
+                            </div>
 
-                        <div class="summary-item manual payment-field">
-                            <label>💰 Actual POS Amount</label>
-                            <div class="input-group">
-                                <span class="currency-prefix">PKR</span>
-                                <input type="number" class="input-glow summary-input payment-input" id="actualPosInput" step="0.01" min="0" value="0" oninput="recalcGrandTotal()">
+                            <div class="summary-item manual payment-field">
+                                <label>💵 Cash Received</label>
+                                <div class="input-group">
+                                    <span class="currency-prefix">PKR</span>
+                                    <input type="number" class="input-glow summary-input payment-input" id="cashInput"
+                                        step="0.01" min="0" value="0" oninput="recalcGrandTotal()">
+                                </div>
+                            </div>
+                            <div class="summary-item manual payment-field">
+                                <label>📱 Online Payments</label>
+                                <div class="input-group">
+                                    <span class="currency-prefix">PKR</span>
+                                    <input type="number" class="input-glow summary-input payment-input" id="onlineInput"
+                                        step="0.01" min="0" value="0" oninput="recalcGrandTotal()">
+                                </div>
+                            </div>
+                            <div class="summary-item auto payment-match-box" id="paymentMatchStatus"
+                                style="grid-row: span 2;">
+                                <label>Payment Match</label>
+                                <div id="paymentStatusContainer">
+                                    <div id="paymentStatusHeader" class="status-header">
+                                        <span id="paymentStatusIcon">⏳</span>
+                                        <span id="paymentStatusLabel">Waiting</span>
+                                    </div>
+                                    <div class="payment-divider"></div>
+                                    <div id="paymentStatusDiff" class="status-diff">Enter values to match Grand Total
+                                    </div>
+                                    <div class="payment-breakdown" id="paymentBreakdown">
+                                        <div class="breakdown-row">
+                                            <span class="breakdown-label">Cash</span>
+                                            <div class="breakdown-track">
+                                                <div class="breakdown-fill" id="cashBar"></div>
+                                            </div>
+                                            <span class="breakdown-value" id="cashDisplay">PKR 0</span>
+                                        </div>
+                                        <div class="breakdown-row">
+                                            <span class="breakdown-label">Online</span>
+                                            <div class="breakdown-track">
+                                                <div class="breakdown-fill" id="onlineBar"></div>
+                                            </div>
+                                            <span class="breakdown-value" id="onlineDisplay">PKR 0</span>
+                                        </div>
+                                        <div class="breakdown-row">
+                                            <span class="breakdown-label">POS</span>
+                                            <div class="breakdown-track">
+                                                <div class="breakdown-fill" id="posBar"></div>
+                                            </div>
+                                            <span class="breakdown-value" id="posDisplay">PKR 0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="summary-item manual payment-field">
+                                <label>💰 Actual POS Amount</label>
+                                <div class="input-group">
+                                    <span class="currency-prefix">PKR</span>
+                                    <input type="number" class="input-glow summary-input payment-input"
+                                        id="actualPosInput" step="0.01" min="0" value="0" oninput="recalcGrandTotal()">
+                                </div>
+                            </div>
+
+                            <div class="summary-item manual payment-field">
+                                <label>🧾 Total TAX Amount</label>
+                                <div class="input-group">
+                                    <input type="number" class="input-glow summary-input payment-input"
+                                        id="totalTaxAmountInput" step="0.01" min="0" value="0"
+                                        oninput="triggerAutoSave()">
+                                </div>
+                            </div>
+
+                            <div class="summary-item grand-total">
+                                <label>Grand Total</label>
+                                <div class="grand-value" id="grandTotal">PKR 0.00</div>
                             </div>
                         </div>
+                    </section>
 
-                        <div class="summary-item manual payment-field">
-                            <label>🧾 Total TAX Amount</label>
-                            <div class="input-group">
-                                <input type="number" class="input-glow summary-input payment-input" id="totalTaxAmountInput" step="0.01" min="0" value="0" oninput="triggerAutoSave()">
+                    <section class="card section-full screenshot-section">
+                        <div class="card-header">
+                            <h2><span class="accent-gold">◆</span> Pancafe Screenshot</h2>
+                            <a id="screenshotOpenLink" href="#" target="_blank" class="btn btn-sm btn-ghost"
+                                style="display:none;margin-left:auto;">Open ↗</a>
+                        </div>
+                        <div id="screenshotDropzone" class="dropzone">
+                            <input type="file" id="screenshotInput" accept="image/*" hidden>
+                            <div id="screenshotPlaceholder" class="dropzone-placeholder">
+                                <div class="dropzone-icon">📸</div>
+                                <p>Drag &amp; drop an image, click to browse, or paste (Ctrl+V)</p>
+                            </div>
+                            <div id="screenshotPreview" class="dropzone-preview" style="display:none">
+                                <img id="screenshotImg" src="" alt="Pancafe Screenshot">
+                                <button type="button" class="btn btn-sm btn-ghost" id="screenshotRemoveBtn"
+                                    style="margin-top:12px;">✕ Remove</button>
                             </div>
                         </div>
-
-                        <div class="summary-item grand-total">
-                            <label>Grand Total</label>
-                            <div class="grand-value" id="grandTotal">PKR 0.00</div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="card section-full screenshot-section">
-                    <div class="card-header">
-                        <h2><span class="accent-gold">◆</span> Pancafe Screenshot</h2>
-                            <a id="screenshotOpenLink" href="#" target="_blank" class="btn btn-sm btn-ghost" style="display:none;margin-left:auto;">Open ↗</a>
-                    </div>
-                    <div id="screenshotDropzone" class="dropzone">
-                        <input type="file" id="screenshotInput" accept="image/*" hidden>
-                        <div id="screenshotPlaceholder" class="dropzone-placeholder">
-                            <div class="dropzone-icon">📸</div>
-                            <p>Drag &amp; drop an image, click to browse, or paste (Ctrl+V)</p>
-                        </div>
-                        <div id="screenshotPreview" class="dropzone-preview" style="display:none">
-                            <img id="screenshotImg" src="" alt="Pancafe Screenshot">
-                            <button type="button" class="btn btn-sm btn-ghost" id="screenshotRemoveBtn" style="margin-top:12px;">✕ Remove</button>
-                        </div>
-                    </div>
-                </section>
+                    </section>
 
                 </div>
 
@@ -319,22 +365,30 @@
                 <!-- Header & Navigation -->
                 <div class="fin-header-top" style="margin-bottom:16px;">
                     <div>
-                        <h1 class="fin-title" id="closedViewTitle"><span class="accent-gold">◆</span> Shift Closed Successfully</h1>
-                        <p class="fin-subtitle" id="closedViewSubtitle">Full financial breakdown, session ledger, inventory state, and verification audit</p>
+                        <h1 class="fin-title" id="closedViewTitle"><span class="accent-gold">◆</span> Shift Closed
+                            Successfully</h1>
+                        <p class="fin-subtitle" id="closedViewSubtitle">Full financial breakdown, session ledger,
+                            inventory state, and verification audit</p>
                     </div>
                     <div class="fin-header-actions">
-                        <button class="btn btn-ghost" id="closedHeaderBackBtn" onclick="showHistoryView()" style="display:none;">← Back to History</button>
+                        <button class="btn btn-ghost" id="closedHeaderBackBtn" onclick="showHistoryView()"
+                            style="display:none;">← Back to History</button>
                     </div>
                 </div>
 
                 <!-- Meta Badges Bar -->
                 <div class="closed-meta-badges">
-                    <span class="closed-pill-badge" id="closedIdBadge"><span class="pill-label">ID:</span> <span id="closedIdDisplay">--</span></span>
-                    <span class="closed-pill-badge" id="cEmployeePill"><span class="pill-label">Operator:</span> <span id="cEmployee">--</span></span>
-                    <span class="closed-pill-badge" id="cDatePill"><span class="pill-label">Date:</span> <span id="cDate">--</span></span>
-                    <span class="closed-pill-badge" id="cShiftPill"><span class="pill-label">Shift:</span> <span id="cShift">--</span></span>
+                    <span class="closed-pill-badge" id="closedIdBadge"><span class="pill-label">ID:</span> <span
+                            id="closedIdDisplay">--</span></span>
+                    <span class="closed-pill-badge" id="cEmployeePill"><span class="pill-label">Employee:</span> <span
+                            id="cEmployee">--</span></span>
+                    <span class="closed-pill-badge" id="cDatePill"><span class="pill-label">Date:</span> <span
+                            id="cDate">--</span></span>
+                    <span class="closed-pill-badge" id="cShiftPill"><span class="pill-label">Shift:</span> <span
+                            id="cShift">--</span></span>
                     <span class="closed-pill-badge closed-status-badge" id="cStatusPill">Closed</span>
-                    <span class="closed-pill-badge" id="cClosedAtPill"><span class="pill-label">Closed At:</span> <span id="cClosedAt">--</span></span>
+                    <span class="closed-pill-badge" id="cClosedAtPill"><span class="pill-label">Closed At:</span> <span
+                            id="cClosedAt">--</span></span>
                 </div>
 
                 <div class="closed-divider"></div>
@@ -512,7 +566,8 @@
                     <button class="btn btn-secondary btn-lg" id="closedStartNewBtn" onclick="handleClosedStartNew()">
                         <span class="btn-icon">🚀</span> Start New Shift
                     </button>
-                    <button class="btn btn-ghost" id="closedBackHistoryBtn" onclick="showHistoryView()" style="display:none;">← Back to History</button>
+                    <button class="btn btn-ghost" id="closedBackHistoryBtn" onclick="showHistoryView()"
+                        style="display:none;">← Back to History</button>
                 </div>
             </section>
         </div>
@@ -522,13 +577,14 @@
         <!-- ═══════════════════════════════════════════════ -->
         <div id="historyView" style="display:none;">
             <section class="card section-full">
-                    <div class="card-header">
-                        <h2><span class="accent-gold">◈</span> Shift History</h2>
-                        <div class="card-actions">
-                            <button class="btn btn-sm btn-ghost" onclick="syncAllToSheets()" title="Sync all unsynced shifts to Google Sheets">📤 Sync All</button>
-                            <button class="btn btn-sm btn-ghost" onclick="refreshHistory()">🔄 Refresh</button>
-                        </div>
+                <div class="card-header">
+                    <h2><span class="accent-gold">◈</span> Shift History</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-sm btn-ghost" onclick="syncAllToSheets()"
+                            title="Sync all unsynced shifts to Google Sheets">📤 Sync All</button>
+                        <button class="btn btn-sm btn-ghost" onclick="refreshHistory()">🔄 Refresh</button>
                     </div>
+                </div>
                 <div id="historyContent">
                     <div class="history-loading">Loading shift history...</div>
                 </div>
@@ -544,35 +600,47 @@
                 <div class="fin-header-top">
                     <div>
                         <h2 class="fin-title"><span class="accent-gold">◈</span> Financial Analytics &amp; Reports</h2>
-                        <p class="fin-subtitle">Executive profit &amp; loss analysis, revenue streams, and shift performance</p>
+                        <p class="fin-subtitle">Executive profit &amp; loss analysis, revenue streams, and shift
+                            performance</p>
                     </div>
                     <div class="fin-header-actions">
-                        <button class="btn btn-sm btn-ghost" onclick="exportFinancialsToCSV()" title="Export filtered data to CSV">📥 Export CSV</button>
-                        <button class="btn btn-sm btn-ghost" onclick="refreshFinancials()" title="Refresh statistics">🔄 Refresh</button>
+                        <button class="btn btn-sm btn-ghost" onclick="exportFinancialsToCSV()"
+                            title="Export filtered data to CSV">📥 Export CSV</button>
+                        <button class="btn btn-sm btn-ghost" onclick="refreshFinancials()" title="Refresh statistics">🔄
+                            Refresh</button>
                     </div>
                 </div>
 
                 <div class="fin-filter-bar">
                     <div class="fin-presets">
-                        <button class="fin-chip active" data-preset="all" onclick="setFinancialPreset('all')">All Time</button>
-                        <button class="fin-chip" data-preset="today" onclick="setFinancialPreset('today')">Today</button>
-                        <button class="fin-chip" data-preset="yesterday" onclick="setFinancialPreset('yesterday')">Yesterday</button>
-                        <button class="fin-chip" data-preset="7d" onclick="setFinancialPreset('7d')">Last 7 Days</button>
-                        <button class="fin-chip" data-preset="30d" onclick="setFinancialPreset('30d')">Last 30 Days</button>
-                        <button class="fin-chip" data-preset="this_month" onclick="setFinancialPreset('this_month')">This Month</button>
+                        <button class="fin-chip active" data-preset="all" onclick="setFinancialPreset('all')">All
+                            Time</button>
+                        <button class="fin-chip" data-preset="today"
+                            onclick="setFinancialPreset('today')">Today</button>
+                        <button class="fin-chip" data-preset="yesterday"
+                            onclick="setFinancialPreset('yesterday')">Yesterday</button>
+                        <button class="fin-chip" data-preset="7d" onclick="setFinancialPreset('7d')">Last 7
+                            Days</button>
+                        <button class="fin-chip" data-preset="30d" onclick="setFinancialPreset('30d')">Last 30
+                            Days</button>
+                        <button class="fin-chip" data-preset="this_month"
+                            onclick="setFinancialPreset('this_month')">This Month</button>
                     </div>
                     <div class="fin-custom-filters">
                         <div class="fin-date-group">
                             <label>From</label>
-                            <input type="date" id="finStartDate" class="input-glow fin-date-input" onchange="onFinancialDateChange()">
+                            <input type="date" id="finStartDate" class="input-glow fin-date-input"
+                                onchange="onFinancialDateChange()">
                         </div>
                         <div class="fin-date-group">
                             <label>To</label>
-                            <input type="date" id="finEndDate" class="input-glow fin-date-input" onchange="onFinancialDateChange()">
+                            <input type="date" id="finEndDate" class="input-glow fin-date-input"
+                                onchange="onFinancialDateChange()">
                         </div>
                         <div class="fin-select-group">
                             <label>Shift</label>
-                            <select id="finShiftFilter" class="input-glow" data-cd-ignore onchange="loadFinancialStats()">
+                            <select id="finShiftFilter" class="input-glow" data-cd-ignore
+                                onchange="loadFinancialStats()">
                                 <option value="all">All Shifts</option>
                                 <option value="Morning">Morning</option>
                                 <option value="Evening">Evening</option>
@@ -715,7 +783,14 @@
                         </div>
                         <div class="fin-table-wrap">
                             <table class="data-table">
-                                <thead><tr><th>Console</th><th>Sessions</th><th>Hours</th><th>Revenue (PKR)</th></tr></thead>
+                                <thead>
+                                    <tr>
+                                        <th>Console</th>
+                                        <th>Sessions</th>
+                                        <th>Hours</th>
+                                        <th>Revenue (PKR)</th>
+                                    </tr>
+                                </thead>
                                 <tbody id="finPS5ConsolesBody"></tbody>
                             </table>
                         </div>
@@ -730,7 +805,14 @@
                     </div>
                     <div class="fin-table-wrap">
                         <table class="data-table">
-                            <thead><tr><th>Rank</th><th>Item Name</th><th>Units Sold</th><th>Restocked</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Item Name</th>
+                                    <th>Units Sold</th>
+                                    <th>Restocked</th>
+                                </tr>
+                            </thead>
                             <tbody id="finInventoryLeaderboardBody"></tbody>
                         </table>
                     </div>
@@ -773,10 +855,12 @@
                 <div class="fin-header-top">
                     <div>
                         <h1 class="fin-title"><span class="accent-gold">⚙</span> System Settings & Configuration</h1>
-                        <p class="fin-subtitle">Manage gaming packages, staff PINs, cafeteria inventory, PS5 lounge rates, and system diagnostics</p>
+                        <p class="fin-subtitle">Manage gaming packages, staff PINs, cafeteria inventory, PS5 lounge
+                            rates, and system diagnostics</p>
                     </div>
                     <div class="fin-header-actions">
-                        <button class="btn btn-secondary" id="btnUnlockSettings" onclick="promptAdminUnlockSettings()" style="display:none;">🔑 Unlock Admin Settings</button>
+                        <button class="btn btn-secondary" id="btnUnlockSettings" onclick="promptAdminUnlockSettings()"
+                            style="display:none;">🔑 Unlock Admin Settings</button>
                         <button class="btn btn-primary" onclick="saveSettings()">💾 Save Changes</button>
                     </div>
                 </div>
@@ -792,7 +876,8 @@
                         <div class="settings-panel-heading">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
                                 <h3>PC Packages</h3>
-                                <span class="settings-lock-badge" id="lockBadgePackages" style="display:none;">🔒 Admin Locked</span>
+                                <span class="settings-lock-badge" id="lockBadgePackages" style="display:none;">🔒 Admin
+                                    Locked</span>
                             </div>
                             <p class="settings-panel-desc">Define Hz, hours, and price for each package tier</p>
                         </div>
@@ -807,8 +892,10 @@
                             <input type="number" class="input-glow" id="newPackageHrsInput" placeholder="6" min="1">
                             <span class="input-unit">hrs</span>
                         </div>
-                        <input type="number" class="input-glow" id="newPackagePriceInput" placeholder="Price" min="0" style="min-width:80px;">
-                        <button class="btn btn-sm btn-secondary" id="btnAddPackage" onclick="addPackage()">+ Add</button>
+                        <input type="number" class="input-glow" id="newPackagePriceInput" placeholder="Price" min="0"
+                            style="min-width:80px;">
+                        <button class="btn btn-sm btn-secondary" id="btnAddPackage" onclick="addPackage()">+
+                            Add</button>
                     </div>
                 </section>
 
@@ -819,15 +906,18 @@
                         <div class="settings-panel-heading">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
                                 <h3>Employees & Staff</h3>
-                                <span class="settings-lock-badge" id="lockBadgeEmployees" style="display:none;">🔒 Admin Locked</span>
+                                <span class="settings-lock-badge" id="lockBadgeEmployees" style="display:none;">🔒 Admin
+                                    Locked</span>
                             </div>
                             <p class="settings-panel-desc">Manage staff names and security PIN codes</p>
                         </div>
                     </div>
                     <div class="settings-list" id="settingsEmployees"></div>
                     <div class="settings-add-row">
-                        <input type="text" class="input-glow" id="newEmployeeInput" placeholder="Employee name" style="min-width:100px;">
-                        <button class="btn btn-sm btn-secondary" id="btnAddEmployee" onclick="addEmployee()">+ Add</button>
+                        <input type="text" class="input-glow" id="newEmployeeInput" placeholder="Employee name"
+                            style="min-width:100px;">
+                        <button class="btn btn-sm btn-secondary" id="btnAddEmployee" onclick="addEmployee()">+
+                            Add</button>
                     </div>
                 </section>
 
@@ -845,8 +935,10 @@
                     </div>
                     <div class="settings-list" id="settingsItems"></div>
                     <div class="settings-add-row">
-                        <input type="text" class="input-glow" id="newItemInput" placeholder="Item name" style="min-width:100px;">
-                        <button class="btn btn-sm btn-secondary" id="btnAddItem" onclick="addInventoryItem()">+ Add</button>
+                        <input type="text" class="input-glow" id="newItemInput" placeholder="Item name"
+                            style="min-width:100px;">
+                        <button class="btn btn-sm btn-secondary" id="btnAddItem" onclick="addInventoryItem()">+
+                            Add</button>
                     </div>
                 </section>
 
@@ -857,31 +949,38 @@
                         <div class="settings-panel-heading">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
                                 <h3>PS5 Pricing Rates</h3>
-                                <span class="settings-lock-badge" id="lockBadgePS5Pricing" style="display:none;">🔒 Admin Locked</span>
+                                <span class="settings-lock-badge" id="lockBadgePS5Pricing" style="display:none;">🔒
+                                    Admin Locked</span>
                             </div>
-                            <p class="settings-panel-desc">Set prices for first hour and extended hours per controller count</p>
+                            <p class="settings-panel-desc">Set prices for first hour and extended hours per controller
+                                count</p>
                         </div>
                     </div>
                     <div class="ps5-pricing-grid">
                         <div class="ps5-pricing-field">
                             <label>2 Controllers — First Hour</label>
-                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PriceTwoFirst" min="0" step="1"></div>
+                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number"
+                                    class="input-glow ps5-pricing-input" id="ps5PriceTwoFirst" min="0" step="1"></div>
                         </div>
                         <div class="ps5-pricing-field">
                             <label>1 Controller — First Hour</label>
-                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PriceOneFirst" min="0" step="1"></div>
+                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number"
+                                    class="input-glow ps5-pricing-input" id="ps5PriceOneFirst" min="0" step="1"></div>
                         </div>
                         <div class="ps5-pricing-field">
                             <label>2 Controllers — Extended/Hour</label>
-                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PriceTwoExt" min="0" step="1"></div>
+                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number"
+                                    class="input-glow ps5-pricing-input" id="ps5PriceTwoExt" min="0" step="1"></div>
                         </div>
                         <div class="ps5-pricing-field">
                             <label>1 Controller — Extended/Hour</label>
-                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PriceOneExt" min="0" step="1"></div>
+                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number"
+                                    class="input-glow ps5-pricing-input" id="ps5PriceOneExt" min="0" step="1"></div>
                         </div>
                         <div class="ps5-pricing-field">
                             <label>PC — Per Controller / Hour</label>
-                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number" class="input-glow ps5-pricing-input" id="ps5PricePcRate" min="0" step="1"></div>
+                            <div class="input-group"><span class="currency-prefix">PKR</span><input type="number"
+                                    class="input-glow ps5-pricing-input" id="ps5PricePcRate" min="0" step="1"></div>
                         </div>
                     </div>
                 </section>
@@ -893,15 +992,18 @@
                         <div class="settings-panel-heading">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
                                 <h3>PS5 / PC Numbers</h3>
-                                <span class="settings-lock-badge" id="lockBadgePS5Numbers" style="display:none;">🔒 Admin Locked</span>
+                                <span class="settings-lock-badge" id="lockBadgePS5Numbers" style="display:none;">🔒
+                                    Admin Locked</span>
                             </div>
                             <p class="settings-panel-desc">Manage available PS5 and PC lounge identifier tags</p>
                         </div>
                     </div>
                     <div class="settings-list" id="settingsPS5Numbers"></div>
                     <div class="settings-add-row">
-                        <input type="text" class="input-glow" id="newPS5NumberInput" placeholder="e.g. Left, Right, PC" style="min-width:100px;">
-                        <button class="btn btn-sm btn-secondary" id="btnAddPS5Number" onclick="addPS5Number()">+ Add</button>
+                        <input type="text" class="input-glow" id="newPS5NumberInput" placeholder="e.g. Left, Right, PC"
+                            style="min-width:100px;">
+                        <button class="btn btn-sm btn-secondary" id="btnAddPS5Number" onclick="addPS5Number()">+
+                            Add</button>
                     </div>
                 </section>
 
@@ -912,14 +1014,18 @@
                         <div class="settings-panel-heading">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
                                 <h3>PC Capacity Configuration</h3>
-                                <span class="settings-lock-badge" id="lockBadgeTotalPCs" style="display:none;">🔒 Admin Locked</span>
+                                <span class="settings-lock-badge" id="lockBadgeTotalPCs" style="display:none;">🔒 Admin
+                                    Locked</span>
                             </div>
-                            <p class="settings-panel-desc">Set the total number of gaming PCs available for package tracking</p>
+                            <p class="settings-panel-desc">Set the total number of gaming PCs available for package
+                                tracking</p>
                         </div>
                     </div>
                     <div style="padding:16px 20px;">
-                        <label style="display:block;margin-bottom:8px;font-size:13px;color:var(--text-dim);">Total PCs Available</label>
-                        <input type="number" id="settingsTotalPCs" class="input-glow" min="1" max="500" value="27" style="width:140px;font-size:15px;font-weight:600;">
+                        <label style="display:block;margin-bottom:8px;font-size:13px;color:var(--text-dim);">Total PCs
+                            Available</label>
+                        <input type="number" id="settingsTotalPCs" class="input-glow" min="1" max="500" value="27"
+                            style="width:140px;font-size:15px;font-weight:600;">
                     </div>
                 </section>
 
@@ -930,13 +1036,17 @@
                             <div class="settings-panel-icon">📋</div>
                             <div class="settings-panel-heading">
                                 <h3>Shift Access Audit Logs</h3>
-                                <p class="settings-panel-desc">Record of staff members who unlocked and viewed closed shift details</p>
+                                <p class="settings-panel-desc">Record of staff members who unlocked and viewed closed
+                                    shift details</p>
                             </div>
                         </div>
-                        <button class="btn btn-sm btn-ghost" onclick="loadAuditLogs()" style="font-size:11px;padding:4px 10px;">🔄 Refresh Logs</button>
+                        <button class="btn btn-sm btn-ghost" onclick="loadAuditLogs()"
+                            style="font-size:11px;padding:4px 10px;">🔄 Refresh Logs</button>
                     </div>
-                    <div class="audit-logs-container" id="auditLogsContainer" style="padding:12px 16px;max-height:320px;overflow-y:auto;">
-                        <div style="text-align:center;color:var(--text-dim);font-size:12px;padding:16px;">Loading access logs...</div>
+                    <div class="audit-logs-container" id="auditLogsContainer"
+                        style="padding:12px 16px;max-height:320px;overflow-y:auto;">
+                        <div style="text-align:center;color:var(--text-dim);font-size:12px;padding:16px;">Loading access
+                            logs...</div>
                     </div>
                 </section>
 
@@ -949,53 +1059,56 @@
 
     <!-- Timer Dashboard Modal -->
     <div class="modal-overlay" id="timerDashboard" style="display:none;">
-      <div class="modal modal-lg">
-        <div class="modal-header" style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid rgba(218,165,32,0.15);padding-bottom:16px;">
-          <div>
-            <h2 style="display:flex;align-items:center;gap:10px;margin:0;">
-              <span style="font-size:22px;">⏱</span>
-              <span>PS5 Session Timer</span>
-              <span class="td-live-dot"></span>
-            </h2>
-            <p style="margin:4px 0 0 0;">Live countdown with background alarm support</p>
-          </div>
-          <div class="td-header-badges" style="flex-shrink:0;">
-            <span class="td-badge td-badge-active" id="tdActiveCount">0 active</span>
-            <span class="td-badge td-badge-ended" id="tdEndedCount">0 ended</span>
-          </div>
+        <div class="modal modal-lg">
+            <div class="modal-header"
+                style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid rgba(218,165,32,0.15);padding-bottom:16px;">
+                <div>
+                    <h2 style="display:flex;align-items:center;gap:10px;margin:0;">
+                        <span style="font-size:22px;">⏱</span>
+                        <span>PS5 Session Timer</span>
+                        <span class="td-live-dot"></span>
+                    </h2>
+                    <p style="margin:4px 0 0 0;">Live countdown with background alarm support</p>
+                </div>
+                <div class="td-header-badges" style="flex-shrink:0;">
+                    <span class="td-badge td-badge-active" id="tdActiveCount">0 active</span>
+                    <span class="td-badge td-badge-ended" id="tdEndedCount">0 ended</span>
+                </div>
+            </div>
+            <div class="modal-body td-body">
+                <table class="td-table" id="timerDashboardBody">
+                    <thead>
+                        <tr>
+                            <th style="width:14%;">PS #</th>
+                            <th style="width:10%;">Ctrl</th>
+                            <th style="width:14%;">Start</th>
+                            <th style="width:14%;">End</th>
+                            <th style="width:22%;">Countdown</th>
+                            <th style="width:12%;">Status</th>
+                            <th style="width:14%;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div id="tdEmpty" class="td-empty">
+                    <div class="td-empty-icon">⏱</div>
+                    <div class="td-empty-title">No sessions to track</div>
+                    <div class="td-empty-desc">Add PS5 sessions with start and end times to see live countdowns here
+                    </div>
+                </div>
+            </div>
+            <div id="tdEditBar" class="td-edit-bar" style="display:none;"></div>
+            <div class="modal-footer td-footer">
+                <div class="td-footer-left">
+                    <span class="td-footer-hint">▸ Alarms work in background — even when minimized</span>
+                </div>
+                <div class="td-footer-right">
+                    <button class="btn btn-sm btn-ghost td-refresh-btn"
+                        onclick="syncTimerRegistry(); renderTimerDashboard();">⟳</button>
+                    <button class="btn btn-ghost" onclick="closeTimerDashboard()">Close</button>
+                </div>
+            </div>
         </div>
-        <div class="modal-body td-body">
-          <table class="td-table" id="timerDashboardBody">
-            <thead>
-              <tr>
-                <th style="width:14%;">PS #</th>
-                <th style="width:10%;">Ctrl</th>
-                <th style="width:14%;">Start</th>
-                <th style="width:14%;">End</th>
-                <th style="width:22%;">Countdown</th>
-                <th style="width:12%;">Status</th>
-                <th style="width:14%;">Actions</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-          <div id="tdEmpty" class="td-empty">
-            <div class="td-empty-icon">⏱</div>
-            <div class="td-empty-title">No sessions to track</div>
-            <div class="td-empty-desc">Add PS5 sessions with start and end times to see live countdowns here</div>
-          </div>
-        </div>
-        <div id="tdEditBar" class="td-edit-bar" style="display:none;"></div>
-        <div class="modal-footer td-footer">
-          <div class="td-footer-left">
-            <span class="td-footer-hint">▸ Alarms work in background — even when minimized</span>
-          </div>
-          <div class="td-footer-right">
-            <button class="btn btn-sm btn-ghost td-refresh-btn" onclick="syncTimerRegistry(); renderTimerDashboard();">⟳</button>
-            <button class="btn btn-ghost" onclick="closeTimerDashboard()">Close</button>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Booking Modal -->
@@ -1038,10 +1151,12 @@
         <div class="modal">
             <div class="modal-body confirm-body">
                 <div class="confirm-icon">🔒</div>
-                <h2 style="font-family:'Montserrat', sans-serif;font-size:18px;color:var(--gold);margin-bottom:8px;">Close Shift</h2>
+                <h2 style="font-family:'Montserrat', sans-serif;font-size:18px;color:var(--gold);margin-bottom:8px;">
+                    Close Shift</h2>
                 <p>Are you sure you want to close this shift?</p>
                 <p>All data will be saved and synced.</p>
-                <p style="margin-top:12px;font-size:13px;color:var(--text-dim);">Grand Total: <span class="confirm-highlight" id="confirmGrandTotal">PKR 0.00</span></p>
+                <p style="margin-top:12px;font-size:13px;color:var(--text-dim);">Grand Total: <span
+                        class="confirm-highlight" id="confirmGrandTotal">PKR 0.00</span></p>
             </div>
             <div class="modal-footer confirm-footer">
                 <button class="btn btn-ghost" id="confirmNoBtn">Cancel</button>
@@ -1065,13 +1180,16 @@
                             <h3>Who are you?</h3>
                         </div>
                     </div>
-                    <select id="adminPinSelect" data-cd-ignore style="width:100%;padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;margin-bottom:16px;">
+                    <select id="adminPinSelect" data-cd-ignore
+                        style="width:100%;padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;margin-bottom:16px;">
                         <option value="">Select admin</option>
                         <option value="Rafay">Rafay</option>
                         <option value="Jahanzaib Khan">Jahanzaib Khan</option>
                     </select>
-                    <input type="password" id="adminPinInput" class="input-glow" placeholder="Enter PIN" style="width:100%;margin-bottom:8px;" autocomplete="new-password">
-                    <input type="password" id="adminPinConfirmInput" class="input-glow" placeholder="Confirm PIN" style="width:100%;display:none;" autocomplete="new-password">
+                    <input type="password" id="adminPinInput" class="input-glow" placeholder="Enter PIN"
+                        style="width:100%;margin-bottom:8px;" autocomplete="new-password">
+                    <input type="password" id="adminPinConfirmInput" class="input-glow" placeholder="Confirm PIN"
+                        style="width:100%;display:none;" autocomplete="new-password">
                     <p id="adminPinError" style="color:var(--danger);font-size:12px;margin-top:4px;display:none;"></p>
                 </div>
             </div>
@@ -1097,9 +1215,12 @@
                             <h3 id="employeePinName">Employee</h3>
                         </div>
                     </div>
-                    <input type="password" id="employeePinInput" class="input-glow" placeholder="Enter PIN" style="width:100%;margin-bottom:8px;" autocomplete="new-password">
-                    <input type="password" id="employeePinConfirmInput" class="input-glow" placeholder="Confirm PIN" style="width:100%;display:none;" autocomplete="new-password">
-                    <p id="employeePinError" style="color:var(--danger);font-size:12px;margin-top:4px;display:none;"></p>
+                    <input type="password" id="employeePinInput" class="input-glow" placeholder="Enter PIN"
+                        style="width:100%;margin-bottom:8px;" autocomplete="new-password">
+                    <input type="password" id="employeePinConfirmInput" class="input-glow" placeholder="Confirm PIN"
+                        style="width:100%;display:none;" autocomplete="new-password">
+                    <p id="employeePinError" style="color:var(--danger);font-size:12px;margin-top:4px;display:none;">
+                    </p>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1126,10 +1247,12 @@
                             <h3 id="shiftAuthTargetShift">Shift Details</h3>
                         </div>
                     </div>
-                    <select id="shiftAuthUserSelect" data-cd-ignore style="width:100%;padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;margin-bottom:16px;">
+                    <select id="shiftAuthUserSelect" data-cd-ignore
+                        style="width:100%;padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;margin-bottom:16px;">
                         <option value="">Select name</option>
                     </select>
-                    <input type="password" id="shiftAuthPinInput" class="input-glow" placeholder="Enter PIN" style="width:100%;margin-bottom:8px;" autocomplete="new-password">
+                    <input type="password" id="shiftAuthPinInput" class="input-glow" placeholder="Enter PIN"
+                        style="width:100%;margin-bottom:8px;" autocomplete="new-password">
                     <p id="shiftAuthError" style="color:var(--danger);font-size:12px;margin-top:4px;display:none;"></p>
                 </div>
             </div>
@@ -1145,7 +1268,8 @@
         <div class="modal tab-lock-modal">
             <div class="tab-lock-icon">🔒</div>
             <h2 class="tab-lock-title">This tab is locked</h2>
-            <p class="tab-lock-desc">This shift form is currently being edited in another tab. Please continue your work there to prevent data loss.</p>
+            <p class="tab-lock-desc">This shift form is currently being edited in another tab. Please continue your work
+                there to prevent data loss.</p>
             <div class="tab-lock-footer">
                 <button class="btn btn-primary btn-lg" id="tabTakeoverBtn" onclick="tabCoordinator.requestTakeover()">
                     <span class="btn-icon">⚡</span> Continue on this tab anyway
@@ -1156,42 +1280,42 @@
 
     <!-- PS5 Alarm Modal -->
     <div class="modal-overlay" id="ps5AlarmModal" style="display:none;">
-      <div class="modal alarm-modal">
-        <div class="alarm-modal-header">
-          <div class="alarm-siren">🔔</div>
-          <h2>TIME'S UP!</h2>
-          <p>A PS5 session has ended</p>
+        <div class="modal alarm-modal">
+            <div class="alarm-modal-header">
+                <div class="alarm-siren">🔔</div>
+                <h2>TIME'S UP!</h2>
+                <p>A PS5 session has ended</p>
+            </div>
+            <div class="alarm-modal-body">
+                <div class="alarm-detail-grid">
+                    <div class="alarm-detail-item">
+                        <span class="alarm-detail-label">PS Number</span>
+                        <span class="alarm-detail-value" id="alarmPsNumber">--</span>
+                    </div>
+                    <div class="alarm-detail-item">
+                        <span class="alarm-detail-label">Controllers</span>
+                        <span class="alarm-detail-value" id="alarmControllers">--</span>
+                    </div>
+                    <div class="alarm-detail-item">
+                        <span class="alarm-detail-label">Start Time</span>
+                        <span class="alarm-detail-value" id="alarmStartTime">--</span>
+                    </div>
+                    <div class="alarm-detail-item">
+                        <span class="alarm-detail-label">Duration</span>
+                        <span class="alarm-detail-value" id="alarmDuration">--</span>
+                    </div>
+                    <div class="alarm-detail-item" style="grid-column:1/-1;border-bottom:none;">
+                        <span class="alarm-detail-label">End Time</span>
+                        <span class="alarm-detail-value alarm-endtime-value" id="alarmEndTime">--</span>
+                    </div>
+                </div>
+            </div>
+            <div class="alarm-modal-footer">
+                <button class="btn btn-ghost btn-lg alarm-test-btn" id="alarmTestBtn">🔊 Test Alarm</button>
+                <button class="btn btn-primary btn-lg alarm-extend-btn" id="alarmExtendBtn">⏱ Extend Hour</button>
+                <button class="btn btn-ghost btn-lg alarm-dismiss-btn" id="alarmDismissBtn">✕ Dismiss</button>
+            </div>
         </div>
-        <div class="alarm-modal-body">
-          <div class="alarm-detail-grid">
-            <div class="alarm-detail-item">
-              <span class="alarm-detail-label">PS Number</span>
-              <span class="alarm-detail-value" id="alarmPsNumber">--</span>
-            </div>
-            <div class="alarm-detail-item">
-              <span class="alarm-detail-label">Controllers</span>
-              <span class="alarm-detail-value" id="alarmControllers">--</span>
-            </div>
-            <div class="alarm-detail-item">
-              <span class="alarm-detail-label">Start Time</span>
-              <span class="alarm-detail-value" id="alarmStartTime">--</span>
-            </div>
-            <div class="alarm-detail-item">
-              <span class="alarm-detail-label">Duration</span>
-              <span class="alarm-detail-value" id="alarmDuration">--</span>
-            </div>
-            <div class="alarm-detail-item" style="grid-column:1/-1;border-bottom:none;">
-              <span class="alarm-detail-label">End Time</span>
-              <span class="alarm-detail-value alarm-endtime-value" id="alarmEndTime">--</span>
-            </div>
-          </div>
-        </div>
-        <div class="alarm-modal-footer">
-          <button class="btn btn-ghost btn-lg alarm-test-btn" id="alarmTestBtn">🔊 Test Alarm</button>
-          <button class="btn btn-primary btn-lg alarm-extend-btn" id="alarmExtendBtn">⏱ Extend Hour</button>
-          <button class="btn btn-ghost btn-lg alarm-dismiss-btn" id="alarmDismissBtn">✕ Dismiss</button>
-        </div>
-      </div>
     </div>
 
     <footer class="footer">
@@ -1201,12 +1325,13 @@
 
     <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js"></script>
     <script src="/static/js/app.js?v=53"></script>
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/static/sw.js', { scope: '/' }).catch(() => {});
-  });
-}
-</script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js', { scope: '/' }).catch(() => { });
+            });
+        }
+    </script>
 </body>
+
 </html>
