@@ -1051,6 +1051,8 @@ function showClosedShiftView(fromHistory) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('closedStartNewBtn').style.display = viewingHistoryShift ? 'none' : '';
     document.getElementById('closedBackHistoryBtn').style.display = viewingHistoryShift ? '' : 'none';
+    const headerBackBtn = document.getElementById('closedHeaderBackBtn');
+    if (headerBackBtn) headerBackBtn.style.display = viewingHistoryShift ? 'inline-flex' : 'none';
 }
 
 function promptShiftViewAuth(shiftData) {
@@ -2192,6 +2194,8 @@ function showConfirmModal() {
 }
 
 function renderClosedShiftView(s) {
+    if (!s) return;
+
     // 1. Dynamic Titles & Context Navigation
     const titleEl = document.getElementById('closedViewTitle');
     const subtitleEl = document.getElementById('closedViewSubtitle');
@@ -2226,22 +2230,32 @@ function renderClosedShiftView(s) {
     }
 
     // 3. Financial Computations
-    const topup = s.topup_sale || 0;
-    const morningPkgTotal = (s.morning_pkg_total !== undefined) ? s.morning_pkg_total : ((s.morning_packages || []).reduce((acc, p) => acc + (parseFloat(p[1]) || 0), 0));
-    const nighterPkgTotal = (s.nighter_pkg_total !== undefined) ? s.nighter_pkg_total : ((s.nighter_packages || []).reduce((acc, p) => acc + (parseFloat(p[1]) || 0), 0));
+    const topup = parseFloat(s.topup_sale) || 0;
+    const morningPkgTotal = (s.morning_pkg_total !== undefined && s.morning_pkg_total !== null)
+        ? parseFloat(s.morning_pkg_total) || 0
+        : ((s.morning_packages || []).reduce((acc, p) => acc + (parseFloat(Array.isArray(p) ? p[1] : (p.price || p.amount || 0)) || 0), 0));
+    const nighterPkgTotal = (s.nighter_pkg_total !== undefined && s.nighter_pkg_total !== null)
+        ? parseFloat(s.nighter_pkg_total) || 0
+        : ((s.nighter_packages || []).reduce((acc, p) => acc + (parseFloat(Array.isArray(p) ? p[1] : (p.price || p.amount || 0)) || 0), 0));
     const packagesTotal = morningPkgTotal + nighterPkgTotal;
-    const ps5Total = s.ps5_total || 0;
-    const cafeTotal = s.cafeteria_sale || 0;
-    const grossTotal = (s.total !== undefined) ? s.total : (topup + packagesTotal + ps5Total + cafeTotal);
+    const ps5Total = parseFloat(s.ps5_total) || 0;
+    const cafeTotal = parseFloat(s.cafeteria_sale) || 0;
+    const grossTotal = (s.total !== undefined && s.total !== null)
+        ? parseFloat(s.total) || 0
+        : (topup + packagesTotal + ps5Total + cafeTotal);
 
-    const cash = s.cash_received || 0;
-    const online = s.online_payments || 0;
-    const pos = s.actual_pos_amount || 0;
-    const paymentCollected = (s.total_payment_received !== undefined) ? s.total_payment_received : (cash + online + pos);
+    const cash = parseFloat(s.cash_received) || 0;
+    const online = parseFloat(s.online_payments) || 0;
+    const pos = parseFloat(s.actual_pos_amount) || 0;
+    const paymentCollected = (s.total_payment_received !== undefined && s.total_payment_received !== null)
+        ? parseFloat(s.total_payment_received) || 0
+        : (cash + online + pos);
 
-    const expenses = s.total_expenses || 0;
-    const tax = s.total_tax_amount || 0;
-    const grandTotal = s.grand_total || (grossTotal - expenses);
+    const expenses = parseFloat(s.total_expenses) || 0;
+    const tax = parseFloat(s.total_tax_amount) || 0;
+    const grandTotal = (s.grand_total !== undefined && s.grand_total !== null)
+        ? parseFloat(s.grand_total) || 0
+        : (grossTotal - expenses);
 
     // Pillar 1: Revenue Streams
     document.getElementById('cTopup').textContent = `PKR ${topup.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
@@ -2277,16 +2291,23 @@ function renderClosedShiftView(s) {
             ps5ListEl.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No PS5 lounge sessions recorded.</div>';
         } else {
             ps5ListEl.innerHTML = `<div class="ps5-detail-list">` + s.ps5_sessions.map(p => {
-                const ext = p[6] ? `<span class="ext-badge" style="font-size:10px;padding:1px 5px;">⚡ EXT</span>` : '';
+                if (!p) return '';
+                const pName = Array.isArray(p) ? (p[0] || 'PS5') : (p.ps_number || 'PS5');
+                const pCtrl = Array.isArray(p) ? (p[1] || 1) : (p.controllers || 1);
+                const pStart = Array.isArray(p) ? (p[2] || '--') : (p.start || '--');
+                const pDuration = Array.isArray(p) ? (p[5] || 1) : (p.duration || 1);
+                const pAmount = Array.isArray(p) ? (p[4] || 0) : (p.amount || 0);
+                const isExt = Array.isArray(p) ? p[6] : p.is_extended;
+                const ext = isExt ? `<span class="ext-badge" style="font-size:10px;padding:1px 5px;">⚡ EXT</span>` : '';
                 return `
                 <div class="detail-row-item">
                     <div class="item-title">
-                        <span>🎮 <strong>${escHtml(p[0])}</strong></span>
-                        <span class="badge-sm" style="font-size:10px;padding:2px 6px;">${p[1]} Ctrl</span>
-                        <span style="color:var(--text-dim);font-size:11px;">${escHtml(p[2] || '--')} (${p[5] || 1}h)</span>
+                        <span>🎮 <strong>${escHtml(String(pName))}</strong></span>
+                        <span class="badge-sm" style="font-size:10px;padding:2px 6px;">${pCtrl} Ctrl</span>
+                        <span style="color:var(--text-dim);font-size:11px;">${escHtml(String(pStart))} (${pDuration}h)</span>
                         ${ext}
                     </div>
-                    <div class="item-amount">PKR ${parseFloat(p[4] || 0).toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
+                    <div class="item-amount">PKR ${parseFloat(pAmount || 0).toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
                 </div>`;
             }).join('') + `</div>`;
         }
@@ -2301,12 +2322,16 @@ function renderClosedShiftView(s) {
 
     const renderPkgList = (list) => {
         if (!list || !list.length) return '<div style="color:var(--text-dim);font-size:11px;padding:4px 0;">None</div>';
-        return `<div class="pkg-detail-list">` + list.map(p => `
+        return `<div class="pkg-detail-list">` + list.map(p => {
+            if (!p) return '';
+            const pkgName = Array.isArray(p) ? p[0] : (p.name || p.package_name || '');
+            const pkgAmt = Array.isArray(p) ? p[1] : (p.price || p.amount || 0);
+            return `
             <div class="detail-row-item">
-                <div class="item-title">📦 ${escHtml(p[0])}</div>
-                <div class="item-amount">PKR ${parseFloat(p[1] || 0).toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
-            </div>
-        `).join('') + `</div>`;
+                <div class="item-title">📦 ${escHtml(String(pkgName))}</div>
+                <div class="item-amount">PKR ${parseFloat(pkgAmt || 0).toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
+            </div>`;
+        }).join('') + `</div>`;
     };
     document.getElementById('cMorningPkgs').innerHTML = renderPkgList(mPkgs);
     document.getElementById('cNighterPkgs').innerHTML = renderPkgList(nPkgs);
@@ -2331,13 +2356,15 @@ function renderClosedShiftView(s) {
                 </thead>
                 <tbody>`;
             invList.forEach(i => {
-                const opening = parseInt(i[1], 10) || 0;
-                const restock = parseInt(i[2], 10) || 0;
-                const closing = parseInt(i[3], 10) || 0;
+                if (!i) return;
+                const itemName = Array.isArray(i) ? i[0] : (i.name || i.item_name || '');
+                const opening = parseInt(Array.isArray(i) ? i[1] : (i.opening || 0), 10) || 0;
+                const restock = parseInt(Array.isArray(i) ? i[2] : (i.restock || 0), 10) || 0;
+                const closing = parseInt(Array.isArray(i) ? i[3] : (i.closing || 0), 10) || 0;
                 const sold = Math.max(0, opening + restock - closing);
                 invHtml += `
                     <tr>
-                        <td>🥤 ${escHtml(i[0])}</td>
+                        <td>🥤 ${escHtml(String(itemName))}</td>
                         <td>${opening}</td>
                         <td style="color:${restock > 0 ? 'var(--accent)' : 'inherit'};">+${restock}</td>
                         <td style="color:${sold > 0 ? 'var(--gold)' : 'inherit'};"><strong>${sold}</strong></td>
@@ -2358,12 +2385,16 @@ function renderClosedShiftView(s) {
         if (!expList.length) {
             expListEl.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No shift expenses recorded.</div>';
         } else {
-            expListEl.innerHTML = `<div class="expense-detail-list">` + expList.map(e => `
+            expListEl.innerHTML = `<div class="expense-detail-list">` + expList.map(e => {
+                if (!e) return '';
+                const expDesc = Array.isArray(e) ? e[0] : (e.description || e.name || '');
+                const expAmt = Array.isArray(e) ? e[1] : (e.amount || 0);
+                return `
                 <div class="detail-row-item">
-                    <div class="item-title">🏷️ ${escHtml(e[0])}</div>
-                    <div class="item-amount" style="color:var(--danger);">PKR ${parseFloat(e[1] || 0).toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
-                </div>
-            `).join('') + `</div>`;
+                    <div class="item-title">🏷️ ${escHtml(String(expDesc))}</div>
+                    <div class="item-amount" style="color:var(--danger);">PKR ${parseFloat(expAmt || 0).toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
+                </div>`;
+            }).join('') + `</div>`;
         }
     }
 
