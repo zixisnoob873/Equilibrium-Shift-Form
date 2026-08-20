@@ -654,6 +654,37 @@ def admin_financial_stats():
 
 
 
+def _values_equal(val_a, val_b):
+    if val_a == val_b:
+        return True
+    if val_a is None or val_b is None:
+        return False
+    if isinstance(val_a, dict) and isinstance(val_b, dict):
+        all_keys = set(val_a.keys()) | set(val_b.keys())
+        for k in all_keys:
+            va = val_a.get(k)
+            vb = val_b.get(k)
+            try:
+                if float(va) != float(vb):
+                    return False
+            except (TypeError, ValueError):
+                if va != vb:
+                    return False
+        return True
+    if isinstance(val_a, list) and isinstance(val_b, list):
+        if len(val_a) != len(val_b):
+            return False
+        for item_a, item_b in zip(val_a, val_b):
+            if not _values_equal(item_a, item_b):
+                return False
+        return True
+    try:
+        if float(val_a) == float(val_b):
+            return True
+    except (TypeError, ValueError):
+        pass
+    return False
+
 RESTRICTED_KEYS = {"employees", "packages", "ps5_pricing", "ps5_numbers", "total_pcs"}
 
 @app.route("/api/settings", methods=["GET", "POST"])
@@ -663,10 +694,10 @@ def handle_settings():
         data.pop("admin_pins", None)
         data.pop("employee_pins", None)
         return jsonify(data)
-    data = request.get_json()
+    data = request.get_json() or {}
     current = load_settings()
     restricted_changed = any(
-        not _values_equal(data.get(k), current.get(k))
+        k in data and not _values_equal(data[k], current.get(k))
         for k in RESTRICTED_KEYS
     )
     if restricted_changed and _require_admin() is None:

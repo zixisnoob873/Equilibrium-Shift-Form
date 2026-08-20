@@ -2637,8 +2637,49 @@ function closeSettings() {
 
 function _requiresAdminPin() {
     if (!_settingsSnapshot) return true;
-    const restricted = ['packages', 'employees', 'ps5_numbers', 'ps5_pricing', 'total_pcs'];
-    return restricted.some(k => JSON.stringify(settingsData[k]) !== JSON.stringify(_settingsSnapshot[k]));
+
+    // 1. Check packages
+    const pkgsA = settingsData.packages || [];
+    const pkgsB = _settingsSnapshot.packages || [];
+    if (pkgsA.length !== pkgsB.length) return true;
+    for (let i = 0; i < pkgsA.length; i++) {
+        if (pkgsA[i].hz !== pkgsB[i].hz || pkgsA[i].hrs !== pkgsB[i].hrs || Number(pkgsA[i].price) !== Number(pkgsB[i].price)) {
+            return true;
+        }
+    }
+
+    // 2. Check employees
+    const empA = settingsData.employees || [];
+    const empB = _settingsSnapshot.employees || [];
+    if (empA.length !== empB.length) return true;
+    for (let i = 0; i < empA.length; i++) {
+        if (empA[i] !== empB[i]) return true;
+    }
+
+    // 3. Check ps5_numbers
+    const numA = settingsData.ps5_numbers || [];
+    const numB = _settingsSnapshot.ps5_numbers || [];
+    if (numA.length !== numB.length) return true;
+    for (let i = 0; i < numA.length; i++) {
+        if (numA[i] !== numB[i]) return true;
+    }
+
+    // 4. Check total_pcs
+    if (Number(settingsData.total_pcs) !== Number(_settingsSnapshot.total_pcs)) {
+        return true;
+    }
+
+    // 5. Check ps5_pricing
+    const ppA = settingsData.ps5_pricing || {};
+    const ppB = _settingsSnapshot.ps5_pricing || {};
+    const rateKeys = ["two_controllers_first_hour", "one_controller_first_hour", "two_controllers_extended", "one_controller_extended", "ps5_pc_rate"];
+    for (const k of rateKeys) {
+        if (Number(ppA[k] || 0) !== Number(ppB[k] || 0)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function _authHeaders() {
