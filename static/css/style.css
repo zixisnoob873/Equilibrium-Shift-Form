@@ -1267,6 +1267,11 @@ select.cd-hidden { display: none !important; }
     background: linear-gradient(145deg, #161616 0%, #111111 100%);
     border: 1px solid rgba(218, 165, 32, 0.2);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    margin-bottom: 20px;
+}
+
+#financialDashboardView .card {
+    margin-bottom: 20px;
 }
 
 .fin-header-top {
