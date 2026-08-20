@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=21">
+    <link rel="stylesheet" href="/static/css/style.css?v=22">
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js" as="script">
     <script src="/static/js/chart.umd.min.js"></script>
 </head>
@@ -621,6 +621,7 @@
                         <p class="fin-subtitle">Manage gaming packages, staff PINs, cafeteria inventory, PS5 lounge rates, and system diagnostics</p>
                     </div>
                     <div class="fin-header-actions">
+                        <button class="btn btn-secondary" id="btnUnlockSettings" onclick="promptAdminUnlockSettings()" style="display:none;">🔑 Unlock Admin Settings</button>
                         <button class="btn btn-ghost" onclick="showFormView()">✕ Back to Form</button>
                         <button class="btn btn-secondary" onclick="openSettings()">↺ Reset</button>
                         <button class="btn btn-primary" onclick="saveSettings()">💾 Save Changes</button>
@@ -636,7 +637,10 @@
                     <div class="settings-panel-header">
                         <div class="settings-panel-icon">📦</div>
                         <div class="settings-panel-heading">
-                            <h3>PC Packages</h3>
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <h3>PC Packages</h3>
+                                <span class="settings-lock-badge" id="lockBadgePackages" style="display:none;">🔒 Admin Locked</span>
+                            </div>
                             <p class="settings-panel-desc">Define Hz, hours, and price for each package tier</p>
                         </div>
                     </div>
@@ -651,7 +655,7 @@
                             <span class="input-unit">hrs</span>
                         </div>
                         <input type="number" class="input-glow" id="newPackagePriceInput" placeholder="Price" min="0" style="min-width:80px;">
-                        <button class="btn btn-sm btn-secondary" onclick="addPackage()">+ Add</button>
+                        <button class="btn btn-sm btn-secondary" id="btnAddPackage" onclick="addPackage()">+ Add</button>
                     </div>
                 </section>
 
@@ -660,30 +664,36 @@
                     <div class="settings-panel-header">
                         <div class="settings-panel-icon">👥</div>
                         <div class="settings-panel-heading">
-                            <h3>Employees & Staff</h3>
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <h3>Employees & Staff</h3>
+                                <span class="settings-lock-badge" id="lockBadgeEmployees" style="display:none;">🔒 Admin Locked</span>
+                            </div>
                             <p class="settings-panel-desc">Manage staff names and security PIN codes</p>
                         </div>
                     </div>
                     <div class="settings-list" id="settingsEmployees"></div>
                     <div class="settings-add-row">
                         <input type="text" class="input-glow" id="newEmployeeInput" placeholder="Employee name" style="min-width:100px;">
-                        <button class="btn btn-sm btn-secondary" onclick="addEmployee()">+ Add</button>
+                        <button class="btn btn-sm btn-secondary" id="btnAddEmployee" onclick="addEmployee()">+ Add</button>
                     </div>
                 </section>
 
-                <!-- 3. Cafeteria Inventory Panel -->
+                <!-- 3. Cafeteria Inventory Panel (ALWAYS UNLOCKED) -->
                 <section class="card settings-panel">
                     <div class="settings-panel-header">
                         <div class="settings-panel-icon">🥤</div>
                         <div class="settings-panel-heading">
-                            <h3>Cafeteria Items</h3>
-                            <p class="settings-panel-desc">Items removed stay visible in active shifts</p>
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <h3>Cafeteria Items</h3>
+                                <span class="settings-unlocked-badge" id="badgeCafeteriaUnlocked">🔓 Open Access</span>
+                            </div>
+                            <p class="settings-panel-desc">Anyone can add, edit, and remove cafeteria items</p>
                         </div>
                     </div>
                     <div class="settings-list" id="settingsItems"></div>
                     <div class="settings-add-row">
                         <input type="text" class="input-glow" id="newItemInput" placeholder="Item name" style="min-width:100px;">
-                        <button class="btn btn-sm btn-secondary" onclick="addInventoryItem()">+ Add</button>
+                        <button class="btn btn-sm btn-secondary" id="btnAddItem" onclick="addInventoryItem()">+ Add</button>
                     </div>
                 </section>
 
@@ -692,7 +702,10 @@
                     <div class="settings-panel-header">
                         <div class="settings-panel-icon">🎮</div>
                         <div class="settings-panel-heading">
-                            <h3>PS5 Pricing Rates</h3>
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <h3>PS5 Pricing Rates</h3>
+                                <span class="settings-lock-badge" id="lockBadgePS5Pricing" style="display:none;">🔒 Admin Locked</span>
+                            </div>
                             <p class="settings-panel-desc">Set prices for first hour and extended hours per controller count</p>
                         </div>
                     </div>
@@ -725,14 +738,17 @@
                     <div class="settings-panel-header">
                         <div class="settings-panel-icon">🎮</div>
                         <div class="settings-panel-heading">
-                            <h3>PS5 / PC Numbers</h3>
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <h3>PS5 / PC Numbers</h3>
+                                <span class="settings-lock-badge" id="lockBadgePS5Numbers" style="display:none;">🔒 Admin Locked</span>
+                            </div>
                             <p class="settings-panel-desc">Manage available PS5 and PC lounge identifier tags</p>
                         </div>
                     </div>
                     <div class="settings-list" id="settingsPS5Numbers"></div>
                     <div class="settings-add-row">
                         <input type="text" class="input-glow" id="newPS5NumberInput" placeholder="e.g. Left, Right, PC" style="min-width:100px;">
-                        <button class="btn btn-sm btn-secondary" onclick="addPS5Number()">+ Add</button>
+                        <button class="btn btn-sm btn-secondary" id="btnAddPS5Number" onclick="addPS5Number()">+ Add</button>
                     </div>
                 </section>
 
@@ -741,7 +757,10 @@
                     <div class="settings-panel-header">
                         <div class="settings-panel-icon">💻</div>
                         <div class="settings-panel-heading">
-                            <h3>PC Capacity Configuration</h3>
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <h3>PC Capacity Configuration</h3>
+                                <span class="settings-lock-badge" id="lockBadgeTotalPCs" style="display:none;">🔒 Admin Locked</span>
+                            </div>
                             <p class="settings-panel-desc">Set the total number of gaming PCs available for package tracking</p>
                         </div>
                     </div>
@@ -1028,7 +1047,7 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js"></script>
-    <script src="/static/js/app.js?v=48"></script>
+    <script src="/static/js/app.js?v=49"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

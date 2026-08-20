@@ -2603,10 +2603,6 @@ let settingsData = {employees:[], inventory_items:[], packages:[]};
 let _settingsSnapshot = null;
 
 async function showSettingsView() {
-    if (!isAdminLoggedIn()) {
-        const authed = await requireAdminAuth();
-        if (!authed) return;
-    }
     hideAllViews();
     const sView = document.getElementById('settingsView');
     if (sView) sView.style.display = 'block';
@@ -2614,6 +2610,14 @@ async function showSettingsView() {
     const btn = document.getElementById('navSettingsBtn');
     if (btn) btn.classList.add('active');
     await openSettings();
+}
+
+async function promptAdminUnlockSettings() {
+    const authed = await requireAdminAuth();
+    if (authed) {
+        showToast('Admin settings unlocked!', 'success');
+        renderSettings();
+    }
 }
 
 async function openSettings() {
@@ -2981,52 +2985,133 @@ function requireEmployeePin(employeeName) {
 }
 
 function renderSettings() {
+    const isAdmin = isAdminLoggedIn();
+
+    // Toggle Unlock button in settings header
+    const unlockBtn = document.getElementById('btnUnlockSettings');
+    if (unlockBtn) {
+        unlockBtn.style.display = isAdmin ? 'none' : 'inline-flex';
+    }
+
+    // Toggle Lock badges on restricted panels
+    const lockBadges = ['lockBadgePackages', 'lockBadgeEmployees', 'lockBadgePS5Pricing', 'lockBadgePS5Numbers', 'lockBadgeTotalPCs'];
+    lockBadges.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = isAdmin ? 'none' : 'inline-flex';
+    });
+
     const renderEmployees = () => {
         const el = document.getElementById('settingsEmployees');
         el.innerHTML = '';
         settingsData.employees.forEach((item, i) => {
             const div = document.createElement('div');
             div.className = 'settings-item';
-            const resetBtn = `<button class="btn btn-sm btn-ghost" onclick="resetEmployeePin(${i})" title="Reset PIN" style="margin-right:4px;padding:2px 8px;font-size:11px;">🔑 Reset PIN</button>`;
-            div.innerHTML = `<span style="flex:1;">${escHtml(item)}</span>${resetBtn}
-                <button class="btn-del-row" onclick="removeItem('settingsEmployees',${i})">✕</button>`;
+            const resetBtn = isAdmin
+                ? `<button class="btn btn-sm btn-ghost" onclick="resetEmployeePin(${i})" title="Reset PIN" style="margin-right:4px;padding:2px 8px;font-size:11px;">🔑 Reset PIN</button>`
+                : `<button class="btn btn-sm btn-ghost" onclick="promptAdminUnlockSettings()" title="Admin PIN required" style="margin-right:4px;padding:2px 8px;font-size:11px;opacity:0.6;">🔒 Reset PIN</button>`;
+            const delBtn = isAdmin
+                ? `<button class="btn-del-row" onclick="removeItem('settingsEmployees',${i})">✕</button>`
+                : `<button class="btn-del-row" style="opacity:0.4;" onclick="promptAdminUnlockSettings()" title="Admin PIN required">🔒</button>`;
+            div.innerHTML = `<span style="flex:1;">${escHtml(item)}</span>${resetBtn}${delBtn}`;
             el.appendChild(div);
         });
     };
+
     const render = (listId, items) => {
         const el = document.getElementById(listId);
         el.innerHTML = '';
+        const isRestricted = (listId !== 'settingsItems');
         items.forEach((item, i) => {
             const div = document.createElement('div');
             div.className = 'settings-item';
-            div.innerHTML = `<span>${escHtml(item)}</span><button class="btn-del-row" onclick="removeItem('${listId}',${i})">✕</button>`;
+            const canDel = !isRestricted || isAdmin;
+            const delBtn = canDel
+                ? `<button class="btn-del-row" onclick="removeItem('${listId}',${i})">✕</button>`
+                : `<button class="btn-del-row" style="opacity:0.4;" onclick="promptAdminUnlockSettings()" title="Admin PIN required">🔒</button>`;
+            div.innerHTML = `<span>${escHtml(item)}</span>${delBtn}`;
             el.appendChild(div);
         });
     };
+
     const renderPackages = () => {
         const el = document.getElementById('settingsPackages');
         el.innerHTML = '';
         (settingsData.packages || []).forEach((pkg, i) => {
             const div = document.createElement('div');
             div.className = 'settings-item';
-            div.innerHTML = `<span>${escHtml(pkg.hz)} ${escHtml(pkg.hrs)} — PKR ${pkg.price}</span><button class="btn-del-row" onclick="removeItem('settingsPackages',${i})">✕</button>`;
+            const delBtn = isAdmin
+                ? `<button class="btn-del-row" onclick="removeItem('settingsPackages',${i})">✕</button>`
+                : `<button class="btn-del-row" style="opacity:0.4;" onclick="promptAdminUnlockSettings()" title="Admin PIN required">🔒</button>`;
+            div.innerHTML = `<span>${escHtml(pkg.hz)} ${escHtml(pkg.hrs)} — PKR ${pkg.price}</span>${delBtn}`;
             el.appendChild(div);
         });
     };
+
     renderEmployees();
-    render('settingsItems', settingsData.inventory_items);
+    render('settingsItems', settingsData.inventory_items); // Cafeteria always unlocked for anyone
     renderPackages();
     render('settingsPS5Numbers', settingsData.ps5_numbers || []);
+
+    // Packages Inputs & Add Button
+    const pkgInputs = [document.getElementById('newPackageHzInput'), document.getElementById('newPackageHrsInput'), document.getElementById('newPackagePriceInput')];
+    pkgInputs.forEach(inp => { if (inp) inp.disabled = !isAdmin; });
+    const addPkgBtn = document.getElementById('btnAddPackage');
+    if (addPkgBtn) {
+        addPkgBtn.disabled = !isAdmin;
+        addPkgBtn.title = isAdmin ? 'Add package' : 'Admin PIN required to add packages';
+    }
+
+    // Employees Input & Add Button
+    const empInp = document.getElementById('newEmployeeInput');
+    if (empInp) empInp.disabled = !isAdmin;
+    const addEmpBtn = document.getElementById('btnAddEmployee');
+    if (addEmpBtn) {
+        addEmpBtn.disabled = !isAdmin;
+        addEmpBtn.title = isAdmin ? 'Add employee' : 'Admin PIN required to add employees';
+    }
+
+    // Cafeteria Input & Add Button (ALWAYS UNLOCKED)
+    const itemInp = document.getElementById('newItemInput');
+    if (itemInp) itemInp.disabled = false;
+    const addItemBtn = document.getElementById('btnAddItem');
+    if (addItemBtn) addItemBtn.disabled = false;
+
+    // PS5 Pricing Inputs
     const pp = settingsData.ps5_pricing || {};
-    document.getElementById('ps5PriceTwoFirst').value = pp.two_controllers_first_hour ?? 700;
-    document.getElementById('ps5PriceOneFirst').value = pp.one_controller_first_hour ?? 400;
-    document.getElementById('ps5PriceTwoExt').value = pp.two_controllers_extended ?? 500;
-    document.getElementById('ps5PriceOneExt').value = pp.one_controller_extended ?? 300;
-    document.getElementById('ps5PricePcRate').value = pp.ps5_pc_rate ?? 250;
-    document.getElementById('settingsTotalPCs').value = settingsData.total_pcs || 27;
+    const ps5Inputs = [
+        document.getElementById('ps5PriceTwoFirst'),
+        document.getElementById('ps5PriceOneFirst'),
+        document.getElementById('ps5PriceTwoExt'),
+        document.getElementById('ps5PriceOneExt'),
+        document.getElementById('ps5PricePcRate')
+    ];
+    if (ps5Inputs[0]) ps5Inputs[0].value = pp.two_controllers_first_hour ?? 700;
+    if (ps5Inputs[1]) ps5Inputs[1].value = pp.one_controller_first_hour ?? 400;
+    if (ps5Inputs[2]) ps5Inputs[2].value = pp.two_controllers_extended ?? 500;
+    if (ps5Inputs[3]) ps5Inputs[3].value = pp.one_controller_extended ?? 300;
+    if (ps5Inputs[4]) ps5Inputs[4].value = pp.ps5_pc_rate ?? 250;
+    ps5Inputs.forEach(inp => { if (inp) inp.disabled = !isAdmin; });
+
+    // PS5 Number Input & Add Button
+    const ps5NumInp = document.getElementById('newPS5NumberInput');
+    if (ps5NumInp) ps5NumInp.disabled = !isAdmin;
+    const addPs5NumBtn = document.getElementById('btnAddPS5Number');
+    if (addPs5NumBtn) {
+        addPs5NumBtn.disabled = !isAdmin;
+        addPs5NumBtn.title = isAdmin ? 'Add station' : 'Admin PIN required to add station numbers';
+    }
+
+    // Total PCs Input
+    const totalPcsInp = document.getElementById('settingsTotalPCs');
+    if (totalPcsInp) {
+        totalPcsInp.value = settingsData.total_pcs || 27;
+        totalPcsInp.disabled = !isAdmin;
+    }
+
+    // Audit logs (Super admin only)
     const auditEl = document.getElementById('auditLogsSection');
     if (auditEl) {
-        if (adminName === 'Rafay' || adminName === 'Jahanzaib Khan') {
+        if (isAdmin && (adminName === 'Rafay' || adminName === 'Jahanzaib Khan')) {
             auditEl.style.display = 'block';
             loadAuditLogs();
         } else {
@@ -3085,7 +3170,12 @@ async function loadAuditLogs() {
     }
 }
 
-function removeItem(listId, idx) {
+async function removeItem(listId, idx) {
+    if (listId !== 'settingsItems' && !isAdminLoggedIn()) {
+        const authed = await requireAdminAuth();
+        if (!authed) return;
+        renderSettings();
+    }
     let arr;
     if (listId === 'settingsEmployees') {
         arr = settingsData.employees;
@@ -3101,7 +3191,12 @@ function removeItem(listId, idx) {
     showToast(`Removed`, 'info');
 }
 
-function addEmployee() {
+async function addEmployee() {
+    if (!isAdminLoggedIn()) {
+        const authed = await requireAdminAuth();
+        if (!authed) return;
+        renderSettings();
+    }
     const inp = document.getElementById('newEmployeeInput');
     const n = inp.value.trim();
     if (!n) { showToast('Enter a name','error'); return; }
@@ -3117,7 +3212,12 @@ function addInventoryItem() {
     settingsData.inventory_items.push(n); inp.value=''; renderSettings(); showToast(`Added: ${n}`,'success');
 }
 
-function addPackage() {
+async function addPackage() {
+    if (!isAdminLoggedIn()) {
+        const authed = await requireAdminAuth();
+        if (!authed) return;
+        renderSettings();
+    }
     const hzInp = document.getElementById('newPackageHzInput');
     const hrsInp = document.getElementById('newPackageHrsInput');
     const priceInp = document.getElementById('newPackagePriceInput');
@@ -3140,7 +3240,12 @@ function addPackage() {
     showToast(`Added: ${hz} ${hrs}`, 'success');
 }
 
-function addPS5Number() {
+async function addPS5Number() {
+    if (!isAdminLoggedIn()) {
+        const authed = await requireAdminAuth();
+        if (!authed) return;
+        renderSettings();
+    }
     const inp = document.getElementById('newPS5NumberInput');
     if (!inp) return;
     const n = inp.value.trim();
