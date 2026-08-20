@@ -18,19 +18,27 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-:: 2. Check if folder is a Git repository
+:: 2. Check if folder is a Git repository (First-time setup handler)
 if not exist ".git" (
-    echo [WARNING] This folder is not yet linked to a Git repository.
+    echo [SETUP] This folder is not yet linked to your GitHub repository.
     echo.
-    echo To link this folder for the first time:
-    echo 1. Open PowerShell or Command Prompt in this folder.
-    echo 2. Run: git init
-    echo 3. Run: git remote add origin ^<YOUR_GITHUB_REPO_URL^>
-    echo 4. Run: git fetch
-    echo 5. Run: git checkout -f main
+    set /p REPO_URL="Enter your GitHub Repository URL: "
+    if "!REPO_URL!"=="" (
+        echo [ERROR] No URL provided. Aborting.
+        pause
+        exit /b 1
+    )
+    
     echo.
-    pause
-    exit /b 1
+    echo [1/3] Initializing Git and linking to GitHub...
+    git init
+    git remote add origin !REPO_URL!
+    git fetch origin main
+    git branch -M main
+    git reset --mixed origin/main
+    git checkout -f main
+    echo [OK] Successfully linked to GitHub!
+    echo.
 )
 
 :: 3. Pull latest changes from GitHub
