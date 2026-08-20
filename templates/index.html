@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=22">
+    <link rel="stylesheet" href="/static/css/style.css?v=23">
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js" as="script">
     <script src="/static/js/chart.umd.min.js"></script>
 </head>
@@ -622,8 +622,6 @@
                     </div>
                     <div class="fin-header-actions">
                         <button class="btn btn-secondary" id="btnUnlockSettings" onclick="promptAdminUnlockSettings()" style="display:none;">🔑 Unlock Admin Settings</button>
-                        <button class="btn btn-ghost" onclick="showFormView()">✕ Back to Form</button>
-                        <button class="btn btn-secondary" onclick="openSettings()">↺ Reset</button>
                         <button class="btn btn-primary" onclick="saveSettings()">💾 Save Changes</button>
                     </div>
                 </div>
@@ -1047,7 +1045,7 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js"></script>
-    <script src="/static/js/app.js?v=49"></script>
+    <script src="/static/js/app.js?v=50"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
