@@ -337,3 +337,4 @@ Runtime configuration file (auto-created with defaults if missing):
 ## License
 
 Internal tool — no license specified.
+"# Equilibrium-Shift-Form" 
