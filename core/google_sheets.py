@@ -13,8 +13,8 @@ IMGBB_KEY_FILE = os.path.join(ROOT_DIR, "imgbb_key.txt")
 SUMMARY_SHEET_NAME = "Shift Summary"
 TRANSACTIONS_SHEET_NAME = "Detailed Transactions"
 
-# Single source of truth for the sheet headers. Both the create-on-missing and
-# Clear Sheets paths write these, so a layout change is one edit here.
+# Single source of truth for the sheet headers. The create-on-missing path
+# writes these, so a layout change is one edit here.
 SUMMARY_HEADERS = [
     "Shift ID", "Date", "Day", "Shift Timing",
     "Employee Name", "Topup Sale", "Morning Pkg Sale",
@@ -156,24 +156,37 @@ class GoogleSheetsManager:
             print(f"  Sheets API error checking transactions sheet: {e}")
             raise
 
-    def _upload_to_imgbb(self, filename: str) -> str:
+    def _upload_to_imgbb(self, filename: str, errors: Optional[list] = None) -> str:
+        """Upload a screenshot to ImgBB and return its URL. On any failure a
+        local-server fallback URL is returned instead; when `errors` is a
+        list, a human-readable reason is appended so callers can surface WHY
+        the fresh upload failed instead of silently degrading."""
+        def _reason(msg):
+            if errors is not None:
+                errors.append(msg)
+
         if not filename:
+            _reason("no filename on record")
             return ""
         filepath = os.path.join(UPLOAD_DIR, filename)
         if not os.path.exists(filepath):
             print(f"  Screenshot file not found: {filepath}")
+            _reason(f"file '{filename}' not found in uploads/")
             return self._local_screenshot_url(filename)
         try:
             size = os.path.getsize(filepath)
             if size < 100:
                 print(f"  Screenshot file too small ({size}b): {filepath}")
+                _reason(f"file too small ({size} bytes)")
                 return self._local_screenshot_url(filename)
         except OSError as e:
             print(f"  Screenshot file check error: {e}")
+            _reason(f"file check error: {e}")
             return self._local_screenshot_url(filename)
 
         if not self.config.imgbb_key:
             print("  ImgBB: No API key configured, using local fallback")
+            _reason("ImgBB API key not configured (imgbb_key.txt)")
             return self._local_screenshot_url(filename)
 
         try:
@@ -194,9 +207,11 @@ class GoogleSheetsManager:
             else:
                 err = data.get("error", {}).get("message", "unknown")
                 print(f"  ImgBB: API error: {err}, using local fallback")
+                _reason(f"API error: {err}")
                 return self._local_screenshot_url(filename)
         except Exception as e:
             print(f"  ImgBB: Error uploading {filename}: {e}, using local fallback")
+            _reason(f"network error: {e}")
             return self._local_screenshot_url(filename)
 
     def _local_screenshot_url(self, filename: str) -> str:
@@ -217,8 +232,8 @@ class GoogleSheetsManager:
     def _resolve_screenshot_url(self, shift: ShiftData, label: str):
         """Return the URL for a screenshot, reusing a previously stored one and
         only calling ImgBB when none exists yet. Persists any freshly obtained
-        URL back onto the shift so re-syncs (Clear Sheets + Sync All, startup
-        sync) never re-upload and never hit the ImgBB rate limit."""
+        URL back onto the shift so re-syncs (Sync All, startup sync) never
+        re-upload and never hit the ImgBB rate limit."""
         if label == "pancafe":
             filename = shift.pancafe_screenshot_filename
             stored = shift.pancafe_screenshot_url
@@ -388,28 +403,3 @@ class GoogleSheetsManager:
                 except Exception:
                     pass
             ws.append_rows(rows)
-
-    def fetch_last_shift_summary(self, done_callback: Callable):
-        def _fetch():
-            try:
-                if not self.is_ready():
-                    if done_callback:
-                        done_callback(None, "Google Sheets not configured")
-                    return
-                self._authenticate()
-                wb = self.client.open_by_key(self.config.sheet_id)
-                ws = wb.worksheet(SUMMARY_SHEET_NAME)
-                all_rows = ws.get_all_values()
-                if len(all_rows) <= 1:
-                    if done_callback:
-                        done_callback(None, "No previous shifts found in sheet")
-                    return
-                header = all_rows[0]
-                last_row = all_rows[-1]
-                data = dict(zip(header, last_row))
-                if done_callback:
-                    done_callback(data, None)
-            except Exception as e:
-                if done_callback:
-                    done_callback(None, str(e))
-        threading.Thread(target=_fetch, daemon=True).start()

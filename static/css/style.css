@@ -325,7 +325,6 @@ select.cd-hidden { display: none !important; }
 .no-shift-banner h3 { font-family:'Montserrat', sans-serif; color:var(--gold); margin-bottom:var(--spacing-sm); font-size:18px; font-weight: 700; }
 .no-shift-banner p { color:var(--text-dim); margin-bottom:20px; max-width: 400px; margin-left: auto; margin-right: auto; }
 #orphanRecoveryMsg { display:none; margin-top:var(--spacing-md); padding:var(--spacing-md); background:rgba(255,215,0,0.05); border-radius:var(--radius-sm); border:1px solid rgba(218,165,32,0.12); }
-#orphanRecoveryMsg { display:none; margin-top:var(--spacing-md); padding:var(--spacing-md); background:rgba(255,215,0,0.05); border-radius:var(--radius-sm); border:1px solid rgba(218,165,32,0.12); }
 .card-header {
     display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--spacing-lg);
 }

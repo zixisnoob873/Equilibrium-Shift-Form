@@ -1,9 +1,9 @@
 CURRENT GOOGLE SHEETS LAYOUT / HEADERS
 ========================================
 Source: core/google_sheets.py (SUMMARY_HEADERS / TRANSACTIONS_HEADERS
-constants) + server.py (clear_sheets). Single source of truth is
-core/google_sheets.py. Synced rows are appended positionally - order
-here MUST match the append code in _append_summary / _append_transactions.
+constants). Single source of truth is core/google_sheets.py. Synced rows
+are appended positionally - order here MUST match the append code in
+_append_summary / _append_transactions.
 
 SHEET 1: "Shift Summary"  (26 columns, one row per shift)
 ----------------------------------------------------------
@@ -68,15 +68,19 @@ online_payments, timestamp
 
 SCREENSHOT URL PERSISTENCE (ImgBB rate-limit safety)
 -----------------------------------------------------
-- ShiftData stores pancafe_screenshot_url / form_screenshot_url locally so a
-  screenshot is uploaded to ImgBB at most once. Sync reuses the stored URL;
-  Clear Sheets harvests existing sheet URLs onto local shift files before
-  wiping; re-upload persists fresh URLs too.
+- ShiftData stores pancafe_screenshot_url / form_screenshot_url locally so
+  regular syncs upload a screenshot to ImgBB at most once and reuse the
+  stored URL. The forced Re-upload endpoint replaces those stored URLs with
+  freshly hosted links on success; failures leave both the cell and the
+  stored URL untouched.
 - _append_summary() calls _resolve_screenshot_url() which returns (url,
   changed); a changed flag triggers save_shift so future re-syncs skip ImgBB.
 
 NOTES
 -------
+- There is intentionally NO clear/wipe endpoint: shift data is append-only.
+  Deleting worksheet tabs manually recreates them empty on the next sync
+  (only unsynced closed shifts re-append).
 - Summary sheet created with cols=len(SUMMARY_HEADERS); transactions sheet
   with cols=len(TRANSACTIONS_HEADERS)+1 (one trailing spare column).
 - Column 11 "Total" == stored grand_total (gross). Column 18 "Grand Total"

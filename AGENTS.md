@@ -9,20 +9,20 @@ python server.py              # http://localhost:5000
 `start.bat` also opens a browser tab; `launch.bat` runs the server only. Google Sheets setup steps in `guide.txt`.
 
 ## Architecture
-- **Backend**: single Flask app in `server.py` (~1093 lines). No blueprints, no app factory, no dependency injection.
-- **Core** (`core/`): `models.py` (dataclasses), `shift_manager.py` (start/close orchestration), `local_cache.py` (atomic JSON file I/O), `google_sheets.py` (Sheets + ImgBB sync).
-- **Frontend**: vanilla JS (`static/js/app.js`, 3415 lines, no framework), single template (`templates/index.html`, 749 lines), dark theme CSS (`static/css/style.css`, 1149 lines, CSS custom properties, no preprocessor).
+- **Backend**: single Flask app in `server.py` (~1310 lines). No blueprints, no app factory, no dependency injection.
+- **Core** (`core/`): `models.py` (dataclasses), `shift_manager.py` (start/close orchestration), `local_cache.py` (atomic JSON file I/O + audit logs), `google_sheets.py` (Sheets + ImgBB sync), `analytics.py` (financial stats aggregation).
+- **Frontend**: vanilla JS (`static/js/app.js`, ~5160 lines incl. one embedded base64 alarm-audio line, no framework), single template (`templates/index.html`, ~1340 lines), dark theme CSS (`static/css/style.css`, ~1980 lines, CSS custom properties, no preprocessor). Chart.js v4.4.1 vendored locally (`static/js/chart.umd.min.js`); PS5 service worker (`static/sw.js`) + alarm source (`static/alarm.wav`).
 - **Config**: defaults in `config.py`, overrides in `settings.json` (employees, inventory, packages, hashed PINs, ps5_pricing, ps5_numbers, total_pcs, admin_users). Both merged at runtime via `get_effective_config()`. `total_pcs` (default 27) drives PC-number dropdown lengths; validated/clamped 1–500 on save and persisted.
 - **State**: shifts stored as `local_data/shift_{8-char-uuid}.json`; each JSON file is a `ShiftData.to_dict()` output. Shift IDs are first 8 chars of `uuid.uuid4()`.
 
 ## Shift lifecycle
 `active` → `close_shift()` → `closed`
 - `close_shift()` in `shift_manager.py` saves locally (atomic `tempfile.mkstemp` + `os.replace`), then **spawns a background daemon thread** (`_sync_closed_shift`) that runs `self.sheets.sync_shift_sync(shift)`. The close request never blocks on the sync. Sync failures logged to `sync_errors.jsonl` (last 100 available via `/api/sync-errors`) and retried by `_startup_sync()` / Sync All.
-- `_startup_sync()` runs on server boot in a daemon thread to sync unsynced closed shifts. Boot also starts `_cleanup_orphan_uploads()` (deletes `uploads/` files older than 30 days not referenced by any shift) and `_sweep_stale_active_shifts()` (if a crash left multiple active shift files, keeps the most recently opened, closes leftovers older than 7 days).
+- `_startup_sync()` runs on server boot in a daemon thread to sync unsynced closed shifts. No other boot-time cleanup jobs run.
 - **Double-close prevention**: `_closing_ids: Set[str]` — `mark_closing()` at try-entry, `unmark_closing()` in `finally`. Returns 429 if shift is already closing.
 - **Stale auto-save rejection**: `last_modified: float` (`time.time()`) on every save. Auto-save endpoint returns 409 if client timestamp < server timestamp (strict `<`). The 200 response echoes `last_modified`, and the client stores it on `currentShift.last_modified` so the next save passes. Auto-save also returns 409 "Shift is being closed" while a close is in flight (`is_closing`), and 409 "Shift is no longer active" for closed shifts.
 - **Close identity merge**: temporal identity fields (date, day, shift, opened_at, status) always come from the stored active shift (`load_shift(shift_id)`, fallback `current_shift`) — never from the close payload, so a stale tab can't rewrite when the shift belongs to. The exception is `employee_name`: it is always overwritten from the close payload (the authenticated closing operator, PIN-verified client-side before close), so the sheet credits whoever actually closed the shift. A same-operator close is a no-op. Only live form data (financials, packages, PS5, inventory, expenses, screenshots) is merged in.
-- **PS5 session schema**: 9-slot list `[ps_number, controllers, start, end, amount, duration, is_extended, row_id, amount_manual]`. `row_id` persists the client-side registry id (alarm identity across reloads); `amount_manual` marks hand-entered amounts that reload must not recompute. `ShiftData.from_dict` is defensive (`_f`/`_i` coercion helpers, non-list guards, backward-compatible with legacy 3-element inventory and <9-slot PS5 entries).
+- **PS5 session schema**: 9-slot list `[ps_number, controllers, start, end, amount, duration, is_extended, row_id, amount_manual]`. `row_id` persists the client-side registry id (alarm identity across reloads); `amount_manual` marks hand-entered amounts that reload must not recompute. All 9 slots are persisted server-side through both auto-save and close. `ShiftData.from_dict` is defensive (`_f`/`_i` coercion helpers, non-list guards, backward-compatible with legacy 3-element inventory and <9-slot PS5 entries).
 - **Payment validation**: `cash_received + online_payments + actual_pos_amount` must equal `grand_total - total_expenses` (net collectable) within 0.01. Both client-side (pre-submit) and server-side (post-submit) validation.
 - **Package hz/hrs fallback**: if submitted package entries have empty hz/hrs (legacy clients), server does `_lookup_package_by_amount()` which matches price against current `settings.json` packages.
 - **Orphan recovery**: `GET /api/session` checks `shift_manager.current_shift` first, then falls back to `get_last_active_shift()` scanning all JSON files for `status == "active"`. Frontend shows recovery toast and repopulates the form.
@@ -37,7 +37,7 @@ Everything in memory is **lost on restart**:
 
 ## Google Sheets / Drive
 - Config files in project root: `credentials.json` (service account key), `sheet_id.txt` (sheet ID), `imgbb_key.txt` (optional ImgBB API key).
-- Sheet tabs: `"Shift Summary"` (24 columns) and `"Detailed Transactions"` (14 columns). Constants `SUMMARY_SHEET_NAME` / `TRANSACTIONS_SHEET_NAME` in `core/google_sheets.py`.
+- Sheet tabs: `"Shift Summary"` (26 columns) and `"Detailed Transactions"` (14 columns). Constants `SUMMARY_SHEET_NAME` / `TRANSACTIONS_SHEET_NAME` in `core/google_sheets.py`; full layout reference in `layout/headers.txt`.
 - **Concurrency safety**: all dedup check + append pairs run under `GoogleSheetsManager._sync_lock` (threading.Lock), so background close sync, startup sync, and Sync All can never double-append — even when they race on the same shift.
 - Dedup (summary, primary): `shift_id` match in column A. Dedup (summary, fallback): `date|employee_name|grand_total` matching by reading all values — also compares `closed_at` when the sheet has a Closed At column, so two legitimate same-day, same-employee, same-total shifts are never confused.
 - Dedup (transactions): each shift's transaction rows share one timestamp, so `(employee_name, closed_at)` (fallback `opened_at`) identifies the block; retries skip if already present.
@@ -48,7 +48,7 @@ Everything in memory is **lost on restart**:
 - Transactions columns: "Timestamp" (col 14).
 - Footer polls `/api/sheets/status` every 5s via `startAutoRefresh()`.
 - **Known Drive quota issue**: basic service accounts have zero Drive storage quota. `_upload_to_drive()` will 403. Fix: create a shared drive.
-- To reset: use Settings UI "Clear Sheets" or delete both worksheets (they auto-recreate on next sync). **Clear Sheets also resets `synced_to_sheets=False` on all closed shifts**, so Sync All / startup sync rebuild the sheet from local data.
+- **No wipe/reset**: there is intentionally NO sheet-clear endpoint — shift data is append-only. Deleting worksheet tabs manually recreates them empty on the next sync (only unsynced closed shifts re-append).
 
 ## Security & Production
 - **CSRF**: Flask-WTF with `csrf_token()` meta tag. `window.fetch` monkey-patched to inject `X-CSRFToken` on all non-GET. App accepts both `X-CSRFToken` and `X-CSRF-Token` (`WTF_CSRF_HEADERS`). Token never expires (`WTF_CSRF_TIME_LIMIT = None`).
@@ -123,22 +123,28 @@ Everything in memory is **lost on restart**:
 | `/api/shift/last-closed` | GET | last closed shift data |
 | `/api/shifts/history` | GET | paginated shift list (page, per_page, has_more) |
 | `/api/shifts/<shift_id>` | GET | single shift detail (closed shifts require admin auth) |
+| `/api/shifts/<shift_id>/view` | POST | name+PIN unlock for closed shift detail; admin token fast path; employees restricted to the 2 most recent closed shifts; writes audit log |
 | `/api/upload-screenshot` | POST | multipart → `uploads/{shift_id}_{uuid}{ext}` |
 | `/api/sheets/status` | GET | whether Google Sheets is configured |
 | `/api/sheets/sync-all` | POST | batch-sync all closed shifts |
 | `/api/sheets/sync-shift/<id>` | POST | sync single shift |
-| `/api/sheets/clear` | POST | clear all sheet data, re-create headers, reset local sync flags |
-| `/api/screenshots/re-upload/<shift_id>` | POST | idempotent screenshot re-upload: skips images whose sheet cell already holds an ImgBB URL (`ibb.co`/`imgbb.com`); uploads only empty/local-fallback cells; missing local files leave the cell unchanged and return a warning |
+| `/api/screenshots/re-upload/<shift_id>` | POST | FORCED fresh ImgBB re-host: every call uploads brand-new copies of this shift's two screenshots and replaces the summary-sheet links (old ibb.co/localhost/empty alike). Ownership gate: only files tagged `{shift_id}_*` are accepted (anti-mixing). On upload failure the existing cell is preserved and the exact reason is surfaced; persisted `*_url` fields are updated on success so Sync All reuses the newest links |
 | `/api/sync-errors` | GET | last 100 sync errors (admin auth) |
 | `/api/health` | GET | health check |
 | `/api/admin/pin-status` | POST | check if admin has a PIN set |
 | `/api/admin/set-pin` | POST | first-time admin PIN setup |
 | `/api/admin/verify-pin` | POST | admin login → returns session token |
 | `/api/admin/session` | GET | verify admin token is still valid |
-| `/api/admin/reset-employee-pin` | POST | admin resets employee PIN |
+| `/api/admin/logout` | POST | invalidate the current admin session token |
+| `/api/admin/audit-logs` | GET | last 100 shift-access audit entries (owner admins only) |
+| `/api/admin/financial-stats` | GET | aggregated analytics (date/shift/employee filters, via `core.analytics`) |
+| `/api/admin/reset-employee-pin` | POST | admin resets employee PIN (live token first, body creds fallback) |
 | `/api/employee/pin-status` | GET | check if employee has a PIN |
 | `/api/employee/set-pin` | POST | first-time employee PIN setup |
 | `/api/employee/verify-pin` | POST | employee PIN verification for close |
+| `/api/alarms/schedule` | POST | upsert PS5 alarm sessions + GC (acked >24h / unacked >7d pruned) |
+| `/api/alarms/pending` | GET | fired, unacknowledged alarms |
+| `/api/alarms/acknowledge` | POST | mark alarm ids acknowledged |
 | `/uploads/<filename>` | GET | serve uploaded screenshot files |
 | `/assets/<path>` | GET | serve static assets (logo.png) |
 
@@ -163,10 +169,10 @@ Everything in memory is **lost on restart**:
 - Admin can reset employee PINs via Settings UI → 🔑 Reset PIN button, restricted to "Rafay" and "Jahanzaib Khan".
 
 ## Testing
-Run from project root: `python tests\test_server_smoke.py` etc., plus `node tests\test_timer_logic.js` (pure-function logic, no DOM). Suites use the live server module with `WTF_CSRF_ENABLED=False`, temp data dirs and fake gspread/ImgBB where needed. Suites: `test_server_smoke` (start/close/auto-save/409s), `test_dedup` (Sheets dedup + partial-failure recovery), `test_reroute_clear` (re-upload + Clear Sheets), `test_reupload` (idempotent screenshot re-upload, 13 checks), `test_alarm_schedule` (alarm GC), `test_total_pcs` (settings persistence + clamp), `test_timer_logic.js` (adjustments/carry-over/custom input, 25 checks). No test framework, no test dependencies.
+Run from project root: `python tests\test_server_smoke.py` etc., plus `node tests\test_timer_logic.js` (pure-function logic, no DOM). Suites use the live server module with `WTF_CSRF_ENABLED=False`, temp data dirs and fake gspread/ImgBB where needed. Suites: `test_server_smoke` (start/close/auto-save/409s), `test_dedup` (Sheets dedup + partial-failure recovery), `test_reroute` (idempotent re-upload column mapping + asserts no sheet-clear endpoint exists), `test_reupload` (idempotent screenshot re-upload, 13 checks), `test_alarm_schedule` (alarm GC), `test_total_pcs` (settings persistence + clamp), `test_settings_permissions` (settings auth split: inventory open, restricted keys admin-only), `test_financial_stats` / `test_financial_e2e` (analytics invariants + dashboard wiring; data-dependent tests skip when `local_data/` is empty), `test_timer_logic.js` (adjustments/carry-over/custom input). No test framework, no test dependencies.
 
 ## Template / static cache busting
-- `style.css?v=16`, `app.js?v=35` hardcoded in `index.html`. Bump `v` on changes to force browser reload.
+- `style.css?v=27`, `app.js?v=54` hardcoded in `index.html`. Bump `v` on changes to force browser reload.
 
 ## Dependencies (beyond flask baseline)
 - `waitress`, `Flask-WTF`, `flask-talisman`, `Pillow`, `gspread`, `google-auth`, `google-api-python-client`

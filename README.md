@@ -100,15 +100,16 @@ Create `imgbb_key.txt` in the project root with your ImgBB API key. Screenshot U
 - Organized copies saved to `screenshots/pancafe_screenshot/` and `screenshots/shift_form_screenshot/`
 - Non-blocking — shift closes even if screenshot upload fails
 - File validation: magic bytes (PNG/JPEG/GIF/WebP/BMP) + Pillow verify + 20MB limit
+- **Re-upload button (History)** — forces a brand-new ImgBB upload of that shift's screenshots and replaces the old sheet links; wrong-shift files are refused, and failures never overwrite working links
 
 ### Google Sheets Sync
-- Two sheets: **Shift Summary** (24 columns) and **Detailed Transactions** (14 columns)
+- Two sheets: **Shift Summary** (26 columns) and **Detailed Transactions** (14 columns)
 - Sync runs in a background thread on shift close — the close request never blocks
 - Dedup by shift_id (primary) or date+employee+total (fallback); transactions deduped by employee+timestamp, all under a lock so concurrent syncs can't double-append
 - Batch sync all unsynced shifts on server startup
 - Manual sync via Settings UI or API
 - Sync errors logged to `local_data/sync_errors.jsonl` (last 100)
-- "Clear Sheets" resets local sync flags so the sheet can be rebuilt from local data
+- **No wipe/reset** — there is intentionally no sheet-clear endpoint; shift data is append-only
 
 ### Shift History
 - Paginated view of all shifts
@@ -137,7 +138,7 @@ Create `imgbb_key.txt` in the project root with your ImgBB API key. Screenshot U
 ## Project Structure
 
 ```
-├── server.py                 # Flask app — all routes (~985 lines)
+├── server.py                 # Flask app — all routes (~1330 lines)
 ├── config.py                 # Defaults: employees, packages, shifts, pricing
 ├── requirements.txt          # Python dependencies
 ├── settings.json             # Runtime overrides (employees, packages, PINs, etc.)
@@ -146,23 +147,29 @@ Create `imgbb_key.txt` in the project root with your ImgBB API key. Screenshot U
 ├── imgbb_key.txt             # Optional ImgBB API key
 ├── setup_sheets.py           # One-time sheet tab creation
 ├── guide.txt                 # Google Cloud setup instructions
-├── start.bat / launch.bat    # Quick-start scripts
+├── start.bat / launch.bat    # Quick-start scripts (update.bat = git updater)
+├── layout/headers.txt        # Google Sheets column layout reference
 ├── AGENTS.md                 # Internal development documentation
 ├── README.md                 # This file
 │
 ├── core/
 │   ├── models.py             # Dataclasses: ShiftData, PackageEntry, PS5Session, etc.
-│   ├── local_cache.py        # Atomic JSON file I/O for shift persistence
+│   ├── local_cache.py        # Atomic JSON file I/O for shift persistence + audit logs
 │   ├── shift_manager.py      # Shift orchestration (start/close lifecycle)
-│   └── google_sheets.py      # Google Sheets sync + ImgBB screenshot upload
+│   ├── google_sheets.py      # Google Sheets sync + ImgBB screenshot upload
+│   └── analytics.py          # Financial stats aggregation for the dashboard
 │
 ├── static/
-│   ├── css/style.css         # Dark theme, CSS custom properties (~944 lines)
-│   └── js/app.js             # Vanilla JS SPA (~2674 lines)
+│   ├── css/style.css         # Dark theme, CSS custom properties (~1980 lines)
+│   ├── js/app.js             # Vanilla JS SPA (~5160 lines incl. embedded alarm audio)
+│   ├── js/chart.umd.min.js   # Chart.js v4.4.1 vendored locally
+│   ├── sw.js                 # PS5 alarm service worker
+│   └── alarm.wav             # Alarm sound source (embedded base64 in app.js)
 │
 ├── templates/
-│   └── index.html            # Single HTML template (~652 lines)
+│   └── index.html            # Single HTML template (~1340 lines)
 │
+├── tests/                    # Self-contained suites (no test framework)
 ├── local_data/               # Shift JSON files (shift_{uuid8}.json)
 ├── uploads/                  # Screenshot files
 ├── screenshots/              # Organized copies (pancafe/ and form/)
@@ -221,6 +228,7 @@ Runtime configuration file (auto-created with defaults if missing):
 | GET | `/api/shift/last-closed` | Most recently closed shift |
 | GET | `/api/shifts/history?page=1&per_page=100` | Paginated shift history |
 | GET | `/api/shifts/:id` | Single shift detail (closed shifts need admin auth) |
+| POST | `/api/shifts/:id/view` | Name+PIN unlock for closed shift detail (employees limited to the 2 most recent closed shifts; audit-logged) |
 
 ### Auth (Admin)
 
@@ -230,7 +238,10 @@ Runtime configuration file (auto-created with defaults if missing):
 | POST | `/api/admin/set-pin` | First-time admin PIN setup |
 | POST | `/api/admin/verify-pin` | Admin login → returns session token |
 | GET | `/api/admin/session` | Verify admin token is still valid |
-| POST | `/api/admin/reset-employee-pin` | Admin resets an employee's PIN |
+| POST | `/api/admin/logout` | Invalidate the current admin session token |
+| GET | `/api/admin/audit-logs` | Last 100 shift-access audit entries (owner admins only) |
+| GET | `/api/admin/financial-stats` | Aggregated analytics (date/shift/employee filters) |
+| POST | `/api/admin/reset-employee-pin` | Admin resets an employee's PIN (live token first, body creds fallback) |
 
 ### Auth (Employee)
 
@@ -254,15 +265,24 @@ Runtime configuration file (auto-created with defaults if missing):
 | GET | `/api/sheets/status` | Whether Google Sheets is configured |
 | POST | `/api/sheets/sync-all` | Batch-sync all unsynced closed shifts |
 | POST | `/api/sheets/sync-shift/:id` | Sync a single shift |
-| POST | `/api/sheets/clear` | Clear all sheet data, re-create headers, reset local sync flags |
 | GET | `/api/sync-errors` | Last 100 sync errors (admin auth) |
+
+> There is intentionally **no sheet-clear endpoint** — shift data is append-only.
+
+### PS5 Alarms
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/alarms/schedule` | Upsert alarm sessions + GC (acked >24h / unacked >7d pruned) |
+| GET | `/api/alarms/pending` | Fired, unacknowledged alarms |
+| POST | `/api/alarms/acknowledge` | Mark alarm ids acknowledged |
 
 ### Screenshots
 
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/api/upload-screenshot` | Upload screenshot (multipart: image + shift_id + type) |
-| POST | `/api/screenshots/re-upload/:id` | Re-upload screenshots to sheet |
+| POST | `/api/screenshots/re-upload/:id` | Force a fresh ImgBB re-host of the shift's two screenshots and replace the sheet links (only `{shift_id}_`-tagged files accepted; on failure the cell is preserved and the reason is surfaced) |
 | GET | `/uploads/:filename` | Serve uploaded screenshot files |
 | GET | `/assets/:path` | Serve static assets |
 
@@ -302,7 +322,7 @@ Runtime configuration file (auto-created with defaults if missing):
 
 1. **Drive quota 403** — Basic Google service accounts have zero Drive storage quota. The `_upload_to_drive()` function will 403. Fix: create a shared drive.
 2. **State volatility** — Admin sessions, rate limiting counters, and the active shift reference are lost on server restart.
-3. **CSS/JS cache busting** — Manual version bumps in `index.html` (`style.css?v=13`, `app.js?v=23`).
+3. **CSS/JS cache busting** — Manual version bumps in `index.html` (`style.css?v=27`, `app.js?v=54`).
 
 ---
 

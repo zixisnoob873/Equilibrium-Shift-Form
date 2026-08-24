@@ -17,11 +17,11 @@ from flask_wtf.csrf import CSRFProtect, generate_csrf
 from flask_talisman import Talisman
 import threading
 from datetime import datetime, timedelta
-from config import APP_NAME, APP_VERSION, EMPLOYEES as DEFAULT_EMPLOYEES, INVENTORY_ITEMS as DEFAULT_INVENTORY, PACKAGES as DEFAULT_PACKAGES, DEFAULT_PS5_PRICING, DEFAULT_TOTAL_PCS, LOCAL_DATA_DIR, UPLOAD_DIR, SCREENSHOTS_DIR, PANCAFE_SCREENSHOTS_DIR, FORM_SCREENSHOTS_DIR, SHIFTS, detect_shift, get_current_date, get_current_day
+from config import APP_NAME, APP_VERSION, BASE_URL, EMPLOYEES as DEFAULT_EMPLOYEES, INVENTORY_ITEMS as DEFAULT_INVENTORY, PACKAGES as DEFAULT_PACKAGES, DEFAULT_PS5_PRICING, DEFAULT_TOTAL_PCS, LOCAL_DATA_DIR, UPLOAD_DIR, SCREENSHOTS_DIR, PANCAFE_SCREENSHOTS_DIR, FORM_SCREENSHOTS_DIR, SHIFTS, detect_shift, get_current_date, get_current_day
 from core.models import ShiftData, PackageEntry, PS5Session, InventoryItem, ExpenseEntry
 from core.shift_manager import ShiftManager
 from core.local_cache import save_shift, get_last_closed_shift, get_last_shift, get_last_active_shift, get_all_shifts, load_shift, log_shift_access, get_shift_access_logs, get_recent_closed_shift_ids
-from core.google_sheets import SUMMARY_SHEET_NAME, TRANSACTIONS_SHEET_NAME
+from core.google_sheets import SUMMARY_SHEET_NAME
 from core.analytics import compute_financial_stats
 
 app = Flask(__name__)
@@ -29,7 +29,7 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
 app.config["WTF_CSRF_HEADERS"] = ["X-CSRFToken", "X-CSRF-Token"]
 app.config["WTF_CSRF_TIME_LIMIT"] = None
 csrf = CSRFProtect(app)
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5000"]}})
+CORS(app, resources={r"/api/*": {"origins": [BASE_URL]}})
 
 csp = {
     "default-src": "'self'",
@@ -93,12 +93,6 @@ def _verify_pin(pin: str, stored: str) -> bool:
         return check_password_hash(stored, pin)
     except ValueError:
         return False
-
-
-def _values_equal(a, b):
-    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-        return a == b
-    return json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
 
 
 def _get_admin_token():
@@ -324,11 +318,16 @@ def close_shift():
     try:
         shift = ShiftData()
         shift.shift_id = shift_id
-        shift.employee_name = shift_data.get("employee_name", "")
-        shift.date = shift_data.get("date", get_current_date())
-        shift.day = shift_data.get("day", get_current_day())
-        shift.shift_name = shift_data.get("shift_name", "")
-        shift.shift_timing = shift_data.get("shift_timing", "")
+        # The authenticated closing operator always wins — the sheet credits
+        # whoever actually closed the shift. A same-operator close is a no-op.
+        shift.employee_name = employee_name
+        # Temporal identity fields ALWAYS come from the stored active shift,
+        # never from the payload, so a stale tab cannot rewrite when the
+        # shift belongs to.
+        shift.date = active.date or get_current_date()
+        shift.day = active.day or get_current_day()
+        shift.shift_name = active.shift_name or shift_data.get("shift_name", "")
+        shift.shift_timing = active.shift_timing or shift_data.get("shift_timing", "")
 
         fin = shift_data.get("financial_summary", {})
         shift.topup_sale = max(0, float(fin.get("topup", 0)))
@@ -362,7 +361,9 @@ def close_shift():
                 ses.get("ps_number", ""), int(ses.get("controllers", 2)),
                 ses.get("start_time", ""), ses.get("end_time", ""), float(ses.get("amount", 0)),
                 int(ses.get("duration_hours", 1)),
-                bool(ses.get("is_extended", False))
+                bool(ses.get("is_extended", False)),
+                str(ses.get("row_id", "") or ""),
+                bool(ses.get("amount_manual", False))
             ))
         for inv in shift_data.get("inventory", []):
             shift.inventory.append(InventoryItem(
@@ -374,7 +375,9 @@ def close_shift():
         for exp in shift_data.get("expenses", []):
             shift.expenses.append(ExpenseEntry(exp.get("description", ""), float(exp.get("amount", 0))))
 
-        shift.opened_at = shift_data.get("opened_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        # opened_at stays from the stored active shift (temporal identity is
+        # never client-rewritable).
+        shift.opened_at = active.opened_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         shift.inventory_items_snapshot = shift_data.get("inventory_items_snapshot", [])
         shift.form_screenshot_filename = shift_data.get("form_screenshot_filename", shift.form_screenshot_filename)
         shift.pancafe_screenshot_filename = shift_data.get("pancafe_screenshot_filename", shift.pancafe_screenshot_filename)
@@ -459,10 +462,9 @@ def auto_save_shift():
             if not hz or not hrs:
                 hz, hrs = _lookup_package_by_amount(amt)
             shift.nighter_packages.append(PackageEntry(pkg.get("pc_name", ""), amt, hz, hrs))
-        shift.ps5_sessions = [PS5Session(ses.get("ps_number", ""), int(ses.get("controllers", 2)), ses.get("start_time", ""), ses.get("end_time", ""), float(ses.get("amount", 0)), int(ses.get("duration_hours", 1)), bool(ses.get("is_extended", False))) for ses in shift_data.get("ps5_sessions", [])]
+        shift.ps5_sessions = [PS5Session(ses.get("ps_number", ""), int(ses.get("controllers", 2)), ses.get("start_time", ""), ses.get("end_time", ""), float(ses.get("amount", 0)), int(ses.get("duration_hours", 1)), bool(ses.get("is_extended", False)), str(ses.get("row_id", "") or ""), bool(ses.get("amount_manual", False))) for ses in shift_data.get("ps5_sessions", [])]
         shift.inventory = [InventoryItem(inv.get("name", ""), int(inv.get("opening_stock", 0)), int(inv.get("restock_qty", 0)), int(inv.get("closing_stock", 0))) for inv in shift_data.get("inventory", [])]
         shift.expenses = [ExpenseEntry(exp.get("description", ""), float(exp.get("amount", 0))) for exp in shift_data.get("expenses", [])]
-        shift.opened_at = shift_data.get("opened_at", shift.opened_at)
         shift.inventory_items_snapshot = shift_data.get("inventory_items_snapshot", shift.inventory_items_snapshot)
         shift.form_screenshot_filename = shift_data.get("form_screenshot_filename", shift.form_screenshot_filename)
         shift.pancafe_screenshot_filename = shift_data.get("pancafe_screenshot_filename", shift.pancafe_screenshot_filename)
@@ -866,14 +868,10 @@ def employee_verify_pin():
 
 @app.route("/api/admin/reset-employee-pin", methods=["POST"])
 def admin_reset_employee_pin():
-    data = request.get_json()
-    admin_name = data.get("admin_name", "").strip()
-    admin_pin = data.get("admin_pin", "")
+    data = request.get_json() or {}
     employee_name = data.get("employee_name", "").strip()
     new_pin = data.get("new_pin", "")
 
-    if admin_name not in get_admin_users():
-        return jsonify({"success": False, "error": "Not an admin user"}), 403
     if not employee_name:
         return jsonify({"success": False, "error": "Employee name required"}), 400
     if len(new_pin) < 4 or len(new_pin) > 20 or not new_pin.isdigit():
@@ -883,12 +881,22 @@ def admin_reset_employee_pin():
     if not _check_rate_limit(ip):
         return jsonify({"success": False, "error": "Too many attempts. Try again later."}), 429
 
-    settings = load_settings()
-    admin_pins = settings.get("admin_pins", {})
-    if not _verify_pin(admin_pin, admin_pins.get(admin_name, "")):
-        _record_failed_attempt(ip)
-        return jsonify({"success": False, "error": "Invalid admin PIN"}), 401
+    # Live admin token first (works on a fresh page with a valid session);
+    # fall back to admin_name + admin_pin body fields.
+    admin_user = _require_admin()
+    if admin_user is None:
+        admin_name = data.get("admin_name", "").strip()
+        admin_pin = data.get("admin_pin", "")
+        if admin_name not in get_admin_users():
+            return jsonify({"success": False, "error": "Not an admin user"}), 403
+        settings_v = load_settings()
+        admin_pins = settings_v.get("admin_pins", {})
+        if not _verify_pin(admin_pin, admin_pins.get(admin_name, "")):
+            _record_failed_attempt(ip)
+            return jsonify({"success": False, "error": "Invalid admin PIN"}), 401
+        admin_user = admin_name
 
+    settings = load_settings()
     employee_pins = settings.get("employee_pins", {})
     employee_pins[employee_name] = _hash_pin(new_pin)
     settings["employee_pins"] = employee_pins
@@ -1099,6 +1107,16 @@ def sync_one_shift(shift_id):
 
 @app.route("/api/screenshots/re-upload/<shift_id>", methods=["POST"])
 def re_upload_screenshots(shift_id):
+    """FORCED fresh ImgBB re-host: every click uploads brand-new copies of
+    this shift's two screenshots and REPLACES the summary-sheet links (old
+    ibb.co / localhost / empty cells alike). Safety rails:
+      - Ownership gate: only files tagged '{shift_id}_*' are accepted, so a
+        foreign/untagged screenshot can never land on another shift's row.
+      - Fail-safe preservation: if the fresh upload fails (bad key, rate
+        limit, network), the existing cell is NEVER overwritten with a
+        localhost fallback — the exact failure reason is returned instead.
+      - Persisted pancafe/form *_url fields are updated so future Sync All
+        runs reuse the newest hosted links."""
     shift = load_shift(shift_id)
     if not shift:
         return jsonify({"success": False, "error": "Shift not found"}), 404
@@ -1132,44 +1150,66 @@ def re_upload_screenshots(shift_id):
         warnings = []
         uploaded = 0
         final_urls = {}
-        for label, filename, col in (
-            ("Pancafe screenshot", shift.pancafe_screenshot_filename, pancafe_col),
-            ("Form screenshot", shift.form_screenshot_filename, form_col),
+        urls_changed = False
+        for label, filename_attr, url_attr, col in (
+            ("Pancafe screenshot", "pancafe_screenshot_filename", "pancafe_screenshot_url", pancafe_col),
+            ("Form screenshot", "form_screenshot_filename", "form_screenshot_url", form_col),
         ):
+            filename = getattr(shift, filename_attr)
             if not filename:
                 warnings.append(f"{label}: no screenshot on record for this shift")
-                final_urls[label] = ""
                 continue
+
+            # Anti-mixing ownership gate: the file must be tagged to THIS shift.
+            if not filename.startswith(f"{shift.shift_id}_"):
+                warnings.append(
+                    f"{label}: file '{filename}' is not tagged to this shift ({shift.shift_id}) - skipped for safety"
+                )
+                continue
+            if not os.path.exists(os.path.join(UPLOAD_DIR, filename)):
+                warnings.append(
+                    f"{label}: file '{filename}' missing locally - cell left unchanged"
+                )
+                continue
+
+            errors = []
+            url = sm._upload_to_imgbb(filename, errors)
+            if not url:
+                warnings.append(f"{label}: upload returned no URL - cell left unchanged")
+                continue
+            if "ibb.co" not in url and "imgbb.com" not in url:
+                reason = "; ".join(errors) if errors else "unknown reason"
+                warnings.append(
+                    f"{label}: fresh ImgBB upload failed ({reason}) - cell left unchanged"
+                )
+                continue
+
             try:
                 current = ws.cell(row_idx, col).value or ""
             except Exception:
                 current = ""
-            if "ibb.co" in current or "imgbb.com" in current:
-                final_urls[label] = current
-                continue
-            if not os.path.exists(os.path.join(UPLOAD_DIR, filename)):
-                warnings.append(
-                    f"{label}: file '{filename}' missing locally — cell left unchanged"
-                )
-                final_urls[label] = current
-                continue
-            url = sm._upload_to_imgbb(filename)
-            if not url:
-                warnings.append(f"{label}: upload returned no URL")
-                final_urls[label] = current
-                continue
-            ws.update_cell(row_idx, col, url)
+            if url != current:
+                ws.update_cell(row_idx, col, url)
+            setattr(shift, url_attr, url)
+            urls_changed = True
             uploaded += 1
             final_urls[label] = url
-            if "ibb.co" not in url and "imgbb.com" not in url:
-                warnings.append(
-                    "ImgBB API key not configured (imgbb_key.txt) — stored local server link instead of imgbb.com"
-                )
+
+        if urls_changed:
+            save_shift(shift)
+
+        if uploaded:
+            message = f"Freshly re-hosted {uploaded} screenshot(s) on ImgBB and replaced the sheet link(s)"
+        elif warnings:
+            message = "Nothing re-uploaded - see warnings"
+        else:
+            message = "Nothing to re-upload"
 
         return jsonify({
             "success": True,
             "skipped": uploaded == 0 and not warnings,
-            "message": "Screenshots re-uploaded and sheet updated" if uploaded else "Nothing to re-upload",
+            "message": message,
+            "uploaded_count": uploaded,
             "pancafe_url": final_urls.get("Pancafe screenshot", ""),
             "form_url": final_urls.get("Form screenshot", ""),
             "warnings": warnings
@@ -1279,33 +1319,9 @@ def _startup_sync():
         print(f"  Note: Could not auto-sync shifts: {e}")
 
 
-@app.route("/api/sheets/clear", methods=["POST"])
-def clear_sheets():
-    if not shift_manager.sheets.is_ready():
-        return jsonify({"success": False, "error": "Google Sheets not configured"}), 400
-    try:
-        sm = shift_manager.sheets
-        sm._authenticate()
-        wb = sm.client.open_by_key(sm.config.sheet_id)
-        ws1 = wb.worksheet("Shift Summary")
-        ws2 = wb.worksheet(TRANSACTIONS_SHEET_NAME)
-        ws1.clear()
-        ws2.clear()
-        ws1.append_row(["Shift ID", "Date", "Day", "Shift Timing",
-            "Employee Name", "Topup Sale", "Morning Pkg Sale",
-            "Nighter Pkg Sale", "PS5 Sale", "Cafeteria Sale",
-            "Total Expenses", "Grand Total", "Cash Received",
-            "Online Payments", "Actual POS Amount", "Total TAX Amount",
-            "Morning Pkg Count", "Nighter Pkg Count",
-            "PS5 Session Count", "Inventory", "Expenses",
-            "Closed At", "Pancafe Screenshot", "Form Screenshot"])
-        ws2.append_row(["Date", "Day", "Shift Name", "Employee",
-            "Type", "Item / Notes", "Controllers", "Start Time",
-            "End Time", "Duration (hrs)", "Amount (PKR)",
-            "Cash Received", "Online Payments", "Timestamp"])
-        return jsonify({"success": True, "message": "All shift data cleared from Google Sheets"})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+# NOTE: There is intentionally NO sheet-clear / data-wipe endpoint. Shift data
+# is append-only; deleting worksheet tabs manually recreates them empty on the
+# next sync (only unsynced closed shifts re-append).
 
 
 if __name__ == "__main__":
