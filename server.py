@@ -1121,17 +1121,58 @@ def re_upload_screenshots(shift_id):
 
         row_idx = existing_ids.index(shift.shift_id) + 1
 
-        pancafe_url = sm._upload_to_imgbb(shift.pancafe_screenshot_filename)
-        form_url = sm._upload_to_imgbb(shift.form_screenshot_filename)
+        # Locate screenshot columns by the sheet's own header row instead of
+        # hardcoding positions. _resolve_column_indices returns 0-based
+        # offsets while gspread cell APIs are 1-based; sheets lacking those
+        # headers (legacy layouts) fall back to their fixed cols 23/24.
+        col_map = sm._resolve_column_indices(ws)
+        pancafe_col = col_map.get("Pancafe Screenshot", 22) + 1
+        form_col = col_map.get("Form Screenshot", 23) + 1
 
-        ws.update_cell(row_idx, 21, pancafe_url)
-        ws.update_cell(row_idx, 22, form_url)
+        warnings = []
+        uploaded = 0
+        final_urls = {}
+        for label, filename, col in (
+            ("Pancafe screenshot", shift.pancafe_screenshot_filename, pancafe_col),
+            ("Form screenshot", shift.form_screenshot_filename, form_col),
+        ):
+            if not filename:
+                warnings.append(f"{label}: no screenshot on record for this shift")
+                final_urls[label] = ""
+                continue
+            try:
+                current = ws.cell(row_idx, col).value or ""
+            except Exception:
+                current = ""
+            if "ibb.co" in current or "imgbb.com" in current:
+                final_urls[label] = current
+                continue
+            if not os.path.exists(os.path.join(UPLOAD_DIR, filename)):
+                warnings.append(
+                    f"{label}: file '{filename}' missing locally — cell left unchanged"
+                )
+                final_urls[label] = current
+                continue
+            url = sm._upload_to_imgbb(filename)
+            if not url:
+                warnings.append(f"{label}: upload returned no URL")
+                final_urls[label] = current
+                continue
+            ws.update_cell(row_idx, col, url)
+            uploaded += 1
+            final_urls[label] = url
+            if "ibb.co" not in url and "imgbb.com" not in url:
+                warnings.append(
+                    "ImgBB API key not configured (imgbb_key.txt) — stored local server link instead of imgbb.com"
+                )
 
         return jsonify({
             "success": True,
-            "message": "Screenshots re-uploaded and sheet updated",
-            "pancafe_url": pancafe_url,
-            "form_url": form_url
+            "skipped": uploaded == 0 and not warnings,
+            "message": "Screenshots re-uploaded and sheet updated" if uploaded else "Nothing to re-upload",
+            "pancafe_url": final_urls.get("Pancafe screenshot", ""),
+            "form_url": final_urls.get("Form screenshot", ""),
+            "warnings": warnings
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
