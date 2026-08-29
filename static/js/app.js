@@ -960,7 +960,7 @@ function _renderBookingPkgs() {
     }
     let h = '';
     pkgs.forEach(p => {
-        const sel = _selectedPkg && _selectedPkg.price === p.price;
+        const sel = _selectedPkg && _selectedPkg.hz === p.hz && _selectedPkg.hrs === p.hrs && _selectedPkg.price === p.price;
         h += `<div class="pkg-card${sel ? ' selected' : ''}" data-price="${p.price}" data-hz="${escHtml(p.hz)}" data-hrs="${escHtml(p.hrs)}" onclick="_selectBookingPkg(this)"><div class="pkg-hz">${escHtml(p.hz)} <span class="pkg-sep">·</span> <span class="pkg-hrs">${escHtml(p.hrs)}</span></div><div class="pkg-card-price">PKR ${p.price}</div></div>`;
     });
     grid.innerHTML = h;
@@ -1001,19 +1001,23 @@ document.getElementById('confirmBookingBtn')?.addEventListener('click', () => {
     if (_selectedPCs.size === 0 || !_selectedPkg || !_bookingShift) return;
     const body = document.getElementById(_bookingShift === 'morning' ? 'morningBody' : 'nighterBody');
     let created = 0, updated = 0;
+    const targetKey = `${_selectedPkg.hz}|${_selectedPkg.hrs}|${_selectedPkg.price}`;
     _selectedPCs.forEach(pcName => {
         const existingRow = _findPkgRow(body, pcName);
         if (existingRow) {
             const amtSelect = existingRow.querySelector('.pkg-amount');
             if (amtSelect) {
-                amtSelect.value = String(_selectedPkg.price);
+                amtSelect.value = targetKey;
                 syncDropdown(amtSelect);
             }
             updated++;
         } else {
             const totalPCs = config.total_pcs || 27;
             const pcOpts = Array.from({length:totalPCs}, (_, i) => `<option value="PC #${i+1}" ${pcName === `PC #${i+1}` ? 'selected' : ''}>PC #${i+1}</option>`).join('');
-            const pkgOpts = sortPackages(config.packages).map(p => `<option value="${p.price}" ${_selectedPkg.price === p.price ? 'selected' : ''}>${escHtml(p.hz)} ${escHtml(p.hrs)} - PKR ${p.price}</option>`).join('');
+            const pkgOpts = sortPackages(config.packages).map(p => {
+                const isSel = _selectedPkg.hz === p.hz && _selectedPkg.hrs === p.hrs && _selectedPkg.price === p.price;
+                return `<option value="${p.hz}|${p.hrs}|${p.price}" data-price="${p.price}" data-hz="${escHtml(p.hz)}" data-hrs="${escHtml(p.hrs)}" ${isSel ? 'selected' : ''}>${escHtml(p.hz)} ${escHtml(p.hrs)} - PKR ${p.price}</option>`;
+            }).join('');
             const row = document.createElement('tr');
             row.innerHTML = `<td><select class="pkg-name" onchange="pcNameSelected(this)"><option value="">PC #</option>${pcOpts}</select></td><td><select class="pkg-amount" onchange="recalcTotals()"><option value="">Select Package</option>${pkgOpts}</select></td><td><button class="btn-del-row" onclick="this.closest('tr').remove(); recalcTotals();">✕</button></td>`;
             body.appendChild(row);
@@ -1315,7 +1319,7 @@ function addPackageRow(type) {
     const body = document.getElementById(type === 'morning' ? 'morningBody' : 'nighterBody');
     const totalPCs = config.total_pcs || 27;
     const pcOpts = Array.from({length:totalPCs}, (_, i) => `<option value="PC #${i+1}">PC #${i+1}</option>`).join('');
-    const pkgOpts = sortPackages(config.packages).map(p => `<option value="${p.price}">${escHtml(p.hz)} ${escHtml(p.hrs)} - PKR ${p.price}</option>`).join('');
+    const pkgOpts = sortPackages(config.packages).map(p => `<option value="${p.hz}|${p.hrs}|${p.price}" data-price="${p.price}" data-hz="${escHtml(p.hz)}" data-hrs="${escHtml(p.hrs)}">${escHtml(p.hz)} ${escHtml(p.hrs)} - PKR ${p.price}</option>`).join('');
     const row = document.createElement('tr');
     row.innerHTML = `
         <td><select class="pkg-name" onchange="pcNameSelected(this)"><option value="">PC #</option>${pcOpts}</select></td>
@@ -1349,7 +1353,18 @@ function initPkgAmountEnter(row, type) {
 function recalcTotals() {
     const calc = (bodyId, totalId) => {
         let t = 0;
-        document.getElementById(bodyId).querySelectorAll('.pkg-amount').forEach(i => t += parseFloat(i.value) || 0);
+        document.getElementById(bodyId).querySelectorAll('.pkg-amount').forEach(i => {
+            const opt = i.options ? i.options[i.selectedIndex] : null;
+            let amt = 0;
+            if (opt && opt.dataset.price) {
+                amt = parseFloat(opt.dataset.price) || 0;
+            } else if (i.value && i.value.includes('|')) {
+                amt = parseFloat(i.value.split('|')[2]) || 0;
+            } else {
+                amt = parseFloat(i.value) || 0;
+            }
+            t += amt;
+        });
         document.getElementById(totalId).textContent = t.toFixed(2);
         return t;
     };
@@ -1636,10 +1651,26 @@ function buildShiftPayload() {
         const d = [];
         document.getElementById(bodyId).querySelectorAll('tr').forEach(r => {
             const n = r.querySelector('.pkg-name')?.value?.trim();
-            const a = parseFloat(r.querySelector('.pkg-amount')?.value) || 0;
-            if (n) {
-                const pkg = (config.packages || []).find(p => p.price === a);
-                d.push({pc_name: n, amount: a, hz: pkg ? pkg.hz : '', hrs: pkg ? pkg.hrs : ''});
+            const sel = r.querySelector('.pkg-amount');
+            if (n && sel && sel.value) {
+                const opt = sel.options ? sel.options[sel.selectedIndex] : null;
+                let a = 0, hz = '', hrs = '';
+                if (opt && (opt.dataset.hz || opt.dataset.price)) {
+                    a = parseFloat(opt.dataset.price) || 0;
+                    hz = opt.dataset.hz || '';
+                    hrs = opt.dataset.hrs || '';
+                } else if (sel.value.includes('|')) {
+                    const parts = sel.value.split('|');
+                    hz = parts[0] || '';
+                    hrs = parts[1] || '';
+                    a = parseFloat(parts[2]) || 0;
+                } else {
+                    a = parseFloat(sel.value) || 0;
+                    const pkg = (config.packages || []).find(p => p.price === a);
+                    hz = pkg ? pkg.hz : '';
+                    hrs = pkg ? pkg.hrs : '';
+                }
+                d.push({pc_name: n, amount: a, hz: hz, hrs: hrs});
             }
         });
         return d;
@@ -2052,17 +2083,33 @@ function populateFormFromShift(s) {
         if (opt) document.getElementById('shiftSelect').value = shiftVal;
         syncDropdown(document.getElementById('shiftSelect'));
     }
-    const mkPkgRow = (name, amt) => {
+    const mkPkgRow = (name, amt, hz, hrs) => {
         const totalPCs = config.total_pcs || 27;
         const pcOpts = Array.from({length:totalPCs}, (_, i) => `<option value="PC #${i+1}" ${name === `PC #${i+1}` ? 'selected' : ''}>PC #${i+1}</option>`).join('');
-        const pkgOpts = sortPackages(config.packages).map(p => `<option value="${p.price}" ${parseFloat(amt) === p.price ? 'selected' : ''}>${p.hz} ${p.hrs} - PKR ${p.price}</option>`).join('');
+        const targetAmt = parseFloat(amt) || 0;
+        const targetHz = (hz || '').trim();
+        const targetHrs = (hrs || '').trim();
+
+        const pkgOpts = sortPackages(config.packages).map(p => {
+            let isMatch = false;
+            if (targetHz && targetHrs) {
+                isMatch = (p.hz === targetHz && p.hrs === targetHrs && p.price === targetAmt);
+            } else {
+                isMatch = (p.price === targetAmt);
+            }
+            return `<option value="${p.hz}|${p.hrs}|${p.price}" data-price="${p.price}" data-hz="${escHtml(p.hz)}" data-hrs="${escHtml(p.hrs)}" ${isMatch ? 'selected' : ''}>${escHtml(p.hz)} ${escHtml(p.hrs)} - PKR ${p.price}</option>`;
+        }).join('');
         return `<td><select class="pkg-name" onchange="pcNameSelected(this)"><option value="">PC #</option>${pcOpts}</select></td><td><select class="pkg-amount" onchange="recalcTotals()"><option value="">Select Package</option>${pkgOpts}</select></td><td><button class="btn-del-row" onclick="this.closest('tr').remove(); recalcTotals();">✕</button></td>`;
     };
     const morningBody = document.getElementById('morningBody');
     morningBody.innerHTML = '';
     (s.morning_packages || []).forEach(p => {
         const row = document.createElement('tr');
-        row.innerHTML = mkPkgRow(p[0], parseFloat(p[1]).toFixed(2));
+        const pName = Array.isArray(p) ? p[0] : (p.pc_name || '');
+        const pAmt = Array.isArray(p) ? p[1] : (p.amount || 0);
+        const pHz = Array.isArray(p) ? p[2] : (p.hz || '');
+        const pHrs = Array.isArray(p) ? p[3] : (p.hrs || '');
+        row.innerHTML = mkPkgRow(pName, pAmt, pHz, pHrs);
         morningBody.appendChild(row);
         initCustomDropdowns(row);
         initPkgAmountEnter(row, 'morning');
@@ -2073,7 +2120,11 @@ function populateFormFromShift(s) {
     nighterBody.innerHTML = '';
     (s.nighter_packages || []).forEach(p => {
         const row = document.createElement('tr');
-        row.innerHTML = mkPkgRow(p[0], parseFloat(p[1]).toFixed(2));
+        const pName = Array.isArray(p) ? p[0] : (p.pc_name || '');
+        const pAmt = Array.isArray(p) ? p[1] : (p.amount || 0);
+        const pHz = Array.isArray(p) ? p[2] : (p.hz || '');
+        const pHrs = Array.isArray(p) ? p[3] : (p.hrs || '');
+        row.innerHTML = mkPkgRow(pName, pAmt, pHz, pHrs);
         nighterBody.appendChild(row);
         initCustomDropdowns(row);
         initPkgAmountEnter(row, 'nighter');
