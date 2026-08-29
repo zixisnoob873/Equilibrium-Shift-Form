@@ -21,7 +21,7 @@ from config import APP_NAME, APP_VERSION, BASE_URL, EMPLOYEES as DEFAULT_EMPLOYE
 from core.models import ShiftData, PackageEntry, PS5Session, InventoryItem, ExpenseEntry
 from core.shift_manager import ShiftManager
 from core.local_cache import save_shift, get_last_closed_shift, get_last_shift, get_last_active_shift, get_all_shifts, load_shift, log_shift_access, get_shift_access_logs, get_recent_closed_shift_ids
-from core.google_sheets import SUMMARY_SHEET_NAME
+from core.google_sheets import SUMMARY_SHEET_NAME, TRANSACTIONS_SHEET_NAME
 from core.analytics import compute_financial_stats
 
 app = Flask(__name__)
@@ -1088,19 +1088,63 @@ def sync_one_shift(shift_id):
         return jsonify({"success": False, "error": "Shift not found"}), 404
     if shift.status not in ("closed",):
         return jsonify({"success": False, "error": "Only closed shifts can be synced"}), 400
-    if shift.synced_to_sheets:
-        return jsonify({"success": True, "message": f"Shift {shift_id} already synced"})
 
     try:
         sm = shift_manager.sheets
         sm._authenticate()
         wb = sm.client.open_by_key(sm.config.sheet_id)
         sm._ensure_sheets_exist(wb)
-        sm._append_summary(wb, shift)
-        sm._append_transactions(wb, shift)
-        shift.synced_to_sheets = True
-        save_shift(shift)
-        return jsonify({"success": True, "message": f"Shift {shift_id} synced"})
+        ws = wb.worksheet(SUMMARY_SHEET_NAME)
+
+        # Presence check (dedup keys): Re-Sync must never duplicate or
+        # overwrite an existing row. It skips work only when BOTH the summary
+        # row AND the transaction block are already in the sheet; a summary
+        # row without transactions (partial failure from an earlier sync) is
+        # recovered by re-running both appends — their internal dedup keeps
+        # the summary untouched while the missing transaction block is
+        # inserted. If the summary row was deleted from the sheet, the shift
+        # is re-inserted in date order regardless of the local synced flag.
+        already_summary = False
+        try:
+            already_summary = shift.shift_id in ws.col_values(1)
+        except Exception:
+            already_summary = False
+        already_tx = False
+        if already_summary:
+            tx_ws = wb.worksheet(TRANSACTIONS_SHEET_NAME)
+            ts = shift.closed_at or shift.opened_at
+            if ts:
+                try:
+                    col_map = sm._resolve_column_indices(tx_ws)
+                    emp_idx = col_map.get("Employee", 3)
+                    ts_idx = col_map.get("Timestamp", 13)
+                    for row in tx_ws.get_all_values()[1:]:
+                        if (row and len(row) > max(emp_idx, ts_idx)
+                                and row[emp_idx] == shift.employee_name
+                                and row[ts_idx] == ts):
+                            already_tx = True
+                            break
+                except Exception:
+                    already_tx = False
+            else:
+                # Legacy shift without a timestamp: no reliable way to match
+                # its block, so trust the summary row's presence.
+                already_tx = True
+        already_present = already_summary and already_tx
+
+        if not already_present:
+            sm._append_summary(wb, shift, ordered=True)
+            sm._append_transactions(wb, shift, ordered=True)
+
+        if not shift.synced_to_sheets:
+            shift.synced_to_sheets = True
+            save_shift(shift)
+
+        if already_present:
+            msg = f"Shift {shift_id} is already in Google Sheets — nothing inserted"
+        else:
+            msg = f"Shift {shift_id} re-synced to Google Sheets in date order"
+        return jsonify({"success": True, "message": msg, "already_present": already_present})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

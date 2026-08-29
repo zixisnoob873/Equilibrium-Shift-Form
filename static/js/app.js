@@ -2621,8 +2621,7 @@ function _renderHistoryItem(s) {
         <div style="margin-top:4px;font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span>ID: ${escHtml(s.shift_id||'--')} | Opened: ${escHtml(s.opened_at||'--')} | Closed: ${escHtml(s.closed_at||'--')}</span>
             ${s.status === 'active' ? `<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();continueShift('${escHtml(s.shift_id)}')" style="font-size:10px;padding:2px 8px;">▶ Continue</button>` : ''}
-            ${s.status === 'closed' && !s.synced_to_sheets ? `<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();syncShiftToSheet('${escHtml(s.shift_id)}')" style="font-size:10px;padding:2px 6px;" title="Sync this shift to Google Sheets">📤 Sync</button>` : ''}
-            ${s.status === 'closed' && s.synced_to_sheets ? `<button class="btn btn-sm btn-ghost" disabled style="font-size:10px;padding:2px 6px;opacity:0.45;cursor:not-allowed;" title="Already synced to Google Sheets">📤 Sync ✓</button>` : ''}
+            ${s.status === 'closed' ? `<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();syncShiftToSheet('${escHtml(s.shift_id)}')" style="font-size:10px;padding:2px 6px;" title="Re-sync this shift to Google Sheets (inserts in date order)">📤 Re-Sync</button>` : ''}
             ${s.status === 'closed' ? `<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();reUploadScreenshots('${escHtml(s.shift_id)}')" style="font-size:10px;padding:2px 6px;" title="Re-upload screenshots to Google Sheets">🖼️ Re-upload</button>` : ''}
         </div>`;
     return div;
@@ -2719,17 +2718,17 @@ async function syncAllToSheets() {
 }
 
 async function syncShiftToSheet(shiftId) {
-    showToast(`Syncing shift ${shiftId}...`, 'info', 30000);
+    showToast(`Re-syncing shift ${shiftId}...`, 'info', 30000);
     try {
         const res = await fetch(`/api/sheets/sync-shift/${shiftId}`, { method: 'POST' });
         const data = await res.json();
         if (data.success) {
-            showToast(`Shift ${shiftId} synced to Google Sheets!`, 'success');
+            showToast(data.message || `Shift ${shiftId} re-synced to Google Sheets!`, 'success');
         } else {
-            showToast(`Sync failed: ${data.error}`, 'error');
+            showToast(`Re-sync failed: ${data.error}`, 'error');
         }
     } catch(e) {
-        showToast('Sync request failed', 'error');
+        showToast('Re-sync request failed', 'error');
     }
 }
 

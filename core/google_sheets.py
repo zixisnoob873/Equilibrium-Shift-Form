@@ -229,6 +229,46 @@ class GoogleSheetsManager:
         except Exception:
             return {}
 
+    def _insert_position(self, rows, date_idx, closed_idx, date_val, closed_val):
+        """Physical 1-based sheet row where (date_val, closed_val) belongs so
+        data stays ordered by (Date, Closed At). Row 1 is assumed to be the
+        header (consistent with the rest of this module). Rows with an empty
+        date are ignored as sort targets; equal keys insert after (stable).
+        Returns None when the entry belongs at the end (caller appends)."""
+        if rows is None or len(rows) < 2 or date_idx is None or closed_idx is None:
+            return None
+        key = ((date_val or "").strip(), (closed_val or "").strip())
+        for i in range(1, len(rows)):
+            row = rows[i]
+            if not row or len(row) <= max(date_idx, closed_idx):
+                continue
+            r_date = (row[date_idx] or "").strip()
+            if not r_date:
+                continue
+            if (r_date, (row[closed_idx] or "").strip()) > key:
+                return i + 1
+        return None
+
+    def _ordered_insert_at(self, ws, rows, col_map, date_key, closed_key, date_fallback, closed_fallback):
+        """Compute the ordered insert row for one sheet, or None to append.
+        Falls back to append when the grid is full: values.append grows the
+        grid automatically, an insert at full capacity would push the last
+        row out of it."""
+        date_idx = col_map.get("Date", date_fallback)
+        closed_idx = col_map.get("Closed At", closed_fallback)
+        if rows is None:
+            try:
+                rows = ws.get_all_values()
+            except Exception:
+                return None
+        insert_at = self._insert_position(rows, date_idx, closed_idx, date_key, closed_key)
+        if insert_at is None:
+            return None
+        row_count = getattr(ws, "row_count", None)
+        if row_count and len(rows) >= row_count:
+            return None
+        return insert_at
+
     def _resolve_screenshot_url(self, shift: ShiftData, label: str):
         """Return the URL for a screenshot, reusing a previously stored one and
         only calling ImgBB when none exists yet. Persists any freshly obtained
@@ -255,7 +295,7 @@ class GoogleSheetsManager:
         if changed:
             save_shift(shift)
 
-    def _append_summary(self, wb, shift: ShiftData):
+    def _append_summary(self, wb, shift: ShiftData, ordered: bool = False):
         ws = wb.worksheet(SUMMARY_SHEET_NAME)
 
         pancafe_url, pancafe_changed = self._resolve_screenshot_url(shift, "pancafe")
@@ -281,6 +321,7 @@ class GoogleSheetsManager:
             # both old sheets (no Shift ID column) and new sheets. Also
             # compares closed_at when available so two legitimate same-day,
             # same-employee, same-total shifts are never confused.
+            rows = None
             if col_map:
                 date_idx = col_map.get("Date")
                 emp_idx = col_map.get("Employee Name")
@@ -322,6 +363,17 @@ class GoogleSheetsManager:
                     except Exception:
                         pass
 
+            # Ordered insertion (Re-Sync): position the shift's row by
+            # (Date, Closed At) so a late-synced shift lands between its
+            # chronological neighbours instead of at the bottom.
+            # None => plain append (existing behaviour for all other paths).
+            insert_at = None
+            if ordered:
+                insert_at = self._ordered_insert_at(
+                    ws, rows, col_map, shift.date, shift.closed_at,
+                    date_fallback=1, closed_fallback=23
+                )
+
             inv_parts = [f"{i.name}: {i.closing_stock}" for i in shift.inventory]
             inv_str = ", ".join(inv_parts) if inv_parts else "None"
 
@@ -330,7 +382,7 @@ class GoogleSheetsManager:
             reconciliation = total_sale - total_payment - shift.total_expenses
             grand_total_net = total_sale - shift.total_expenses
 
-            ws.append_row([
+            summary_row = [
                 shift.shift_id,
                 shift.date, shift.day, shift.shift_timing,
                 shift.employee_name, shift.topup_sale, shift.morning_pkg_total,
@@ -347,10 +399,14 @@ class GoogleSheetsManager:
                 shift.closed_at,
                 pancafe_url,
                 form_url
-            ])
+            ]
+            if insert_at is None:
+                ws.append_row(summary_row)
+            else:
+                ws.insert_row(summary_row, insert_at)
         self._persist_screenshot_urls(shift, changed)
 
-    def _append_transactions(self, wb, shift: ShiftData):
+    def _append_transactions(self, wb, shift: ShiftData, ordered: bool = False):
         ws = wb.worksheet(TRANSACTIONS_SHEET_NAME)
         ts = shift.closed_at or shift.opened_at
         cash = shift.cash_received
@@ -384,8 +440,9 @@ class GoogleSheetsManager:
         # one timestamp, so (employee, timestamp) uniquely identifies the
         # block; retries and concurrent syncs can never double-append.
         with self._sync_lock:
+            col_map = self._resolve_column_indices(ws) if (ts or ordered) else {}
+            insert_at = None
             if ts:
-                col_map = self._resolve_column_indices(ws)
                 emp_idx = col_map.get("Employee")
                 ts_idx = col_map.get("Timestamp")
                 if emp_idx is None:
@@ -400,6 +457,25 @@ class GoogleSheetsManager:
                                 if row[emp_idx] == shift.employee_name and row[ts_idx] == ts:
                                     print(f"  Dedup: transactions for shift {shift.shift_id} already exist, skipping")
                                     return
+                        if ordered:
+                            insert_at = self._ordered_insert_at(
+                                ws, values, col_map, shift.date, ts,
+                                date_fallback=0, closed_fallback=13
+                            )
                 except Exception:
                     pass
-            ws.append_rows(rows)
+            elif ordered:
+                # Legacy shift with no timestamp: order by date only, after
+                # any same-date rows.
+                try:
+                    values = ws.get_all_values()
+                    insert_at = self._ordered_insert_at(
+                        ws, values, col_map, shift.date, "\uffff",
+                        date_fallback=0, closed_fallback=0
+                    )
+                except Exception:
+                    pass
+            if insert_at is None:
+                ws.append_rows(rows)
+            else:
+                ws.insert_rows(rows, insert_at)
