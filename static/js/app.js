@@ -885,8 +885,7 @@ function openBookingModal(shift, preselectedPC) {
     document.getElementById('bookingShiftLabel').textContent = shift === 'morning' ? '🌅 Morning' : '🌙 Nighter';
     _renderBookingPCGrid();
     _renderBookingPkgs();
-    document.getElementById('confirmBookingBtn').disabled = true;
-    document.getElementById('bookingSelectionSummary').textContent = 'Select PCs and a package to continue';
+    _updateBookingBtn();
     openModal('bookingModal');
 }
 
@@ -979,13 +978,15 @@ function _updateBookingBtn() {
     const count = _selectedPCs.size;
     if (count > 0 && _selectedPkg) {
         btn.disabled = false;
-        sum.textContent = `${count} PC${count > 1 ? 's' : ''} · ${_selectedPkg.hz} ${_selectedPkg.hrs} · PKR ${_selectedPkg.price}`;
+        const total = (count * _selectedPkg.price).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        const unitPrice = _selectedPkg.price.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        sum.innerHTML = `<div class="booking-summary-sub">${count} PC${count > 1 ? 's' : ''} · ${escHtml(_selectedPkg.hz)} ${escHtml(_selectedPkg.hrs)} (PKR ${unitPrice}/PC)</div><div class="booking-summary-total">Total Price: PKR ${total}</div>`;
     } else if (count > 0) {
         btn.disabled = true;
-        sum.textContent = `${count} PC${count > 1 ? 's' : ''} selected — choose a package`;
+        sum.innerHTML = `<div class="booking-summary-sub">${count} PC${count > 1 ? 's' : ''} selected — choose a package</div>`;
     } else {
         btn.disabled = true;
-        sum.textContent = 'Select PCs and a package to continue';
+        sum.innerHTML = `<div class="booking-summary-sub">Select PCs and a package to continue</div>`;
     }
 }
 
@@ -1034,8 +1035,7 @@ document.getElementById('confirmBookingBtn')?.addEventListener('click', () => {
     _selectedPkg = null;
     _renderBookingPCGrid();
     _renderBookingPkgs();
-    document.getElementById('confirmBookingBtn').disabled = true;
-    document.getElementById('bookingSelectionSummary').textContent = 'Select PCs and a package to continue';
+    _updateBookingBtn();
     showToast(parts.join(' · ') + ' for ' + _bookingShift + ' shift', 'success');
     closeBookingModal();
 });
