@@ -1775,8 +1775,10 @@ function payloadToStorageFormat(payload) {
     return out;
 }
 
+let _isPopulatingForm = false;
+
 function triggerAutoSave() {
-    if (!currentShift) return;
+    if (_isPopulatingForm || !currentShift) return;
     const payload = buildShiftPayload();
     saveLocalDraft(payload);  // Immediate local persistence (zero-loss)
     clearTimeout(autoSaveTimer);
@@ -1784,8 +1786,13 @@ function triggerAutoSave() {
 }
 
 async function doAutoSave() {
-    if (!currentShift || !currentShift.shift_id) return;
+    if (_isPopulatingForm || !currentShift || !currentShift.shift_id) return;
     const payload = buildShiftPayload();
+    // Safety guard: if form DOM is empty/uninitialized while active shift has employee data, abort save
+    if (!payload.employee_name && currentShift.employee_name) {
+        console.warn('Auto-save aborted: form DOM uninitialized or missing employee name');
+        return;
+    }
     const maxRetries = 3;
     let serverReachable = false;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -2073,136 +2080,141 @@ async function closeShift() {
 
 function populateFormFromShift(s) {
     if (!s) return;
-    if (s.employee_name) {
-        document.getElementById('employeeSelect').value = s.employee_name;
-        syncDropdown(document.getElementById('employeeSelect'));
-    }
-    if (s.shift_name && s.shift_timing) {
-        const shiftVal = `${s.shift_name} (${s.shift_timing})`;
-        const opt = Array.from(document.getElementById('shiftSelect').options).find(o => o.value === shiftVal);
-        if (opt) document.getElementById('shiftSelect').value = shiftVal;
-        syncDropdown(document.getElementById('shiftSelect'));
-    }
-    const mkPkgRow = (name, amt, hz, hrs) => {
-        const totalPCs = config.total_pcs || 27;
-        const pcOpts = Array.from({length:totalPCs}, (_, i) => `<option value="PC #${i+1}" ${name === `PC #${i+1}` ? 'selected' : ''}>PC #${i+1}</option>`).join('');
-        const targetAmt = parseFloat(amt) || 0;
-        const targetHz = (hz || '').trim();
-        const targetHrs = (hrs || '').trim();
-
-        const pkgOpts = sortPackages(config.packages).map(p => {
-            let isMatch = false;
-            if (targetHz && targetHrs) {
-                isMatch = (p.hz === targetHz && p.hrs === targetHrs && p.price === targetAmt);
-            } else {
-                isMatch = (p.price === targetAmt);
-            }
-            return `<option value="${p.hz}|${p.hrs}|${p.price}" data-price="${p.price}" data-hz="${escHtml(p.hz)}" data-hrs="${escHtml(p.hrs)}" ${isMatch ? 'selected' : ''}>${escHtml(p.hz)} ${escHtml(p.hrs)} - PKR ${p.price}</option>`;
-        }).join('');
-        return `<td><select class="pkg-name" onchange="pcNameSelected(this)"><option value="">PC #</option>${pcOpts}</select></td><td><select class="pkg-amount" onchange="recalcTotals()"><option value="">Select Package</option>${pkgOpts}</select></td><td><button class="btn-del-row" onclick="this.closest('tr').remove(); recalcTotals();">✕</button></td>`;
-    };
-    const morningBody = document.getElementById('morningBody');
-    morningBody.innerHTML = '';
-    (s.morning_packages || []).forEach(p => {
-        const row = document.createElement('tr');
-        const pName = Array.isArray(p) ? p[0] : (p.pc_name || '');
-        const pAmt = Array.isArray(p) ? p[1] : (p.amount || 0);
-        const pHz = Array.isArray(p) ? p[2] : (p.hz || '');
-        const pHrs = Array.isArray(p) ? p[3] : (p.hrs || '');
-        row.innerHTML = mkPkgRow(pName, pAmt, pHz, pHrs);
-        morningBody.appendChild(row);
-        initCustomDropdowns(row);
-        initPkgAmountEnter(row, 'morning');
-        syncDropdown(row.querySelector('.pkg-name'));
-        syncDropdown(row.querySelector('.pkg-amount'));
-    });
-    const nighterBody = document.getElementById('nighterBody');
-    nighterBody.innerHTML = '';
-    (s.nighter_packages || []).forEach(p => {
-        const row = document.createElement('tr');
-        const pName = Array.isArray(p) ? p[0] : (p.pc_name || '');
-        const pAmt = Array.isArray(p) ? p[1] : (p.amount || 0);
-        const pHz = Array.isArray(p) ? p[2] : (p.hz || '');
-        const pHrs = Array.isArray(p) ? p[3] : (p.hrs || '');
-        row.innerHTML = mkPkgRow(pName, pAmt, pHz, pHrs);
-        nighterBody.appendChild(row);
-        initCustomDropdowns(row);
-        initPkgAmountEnter(row, 'nighter');
-        syncDropdown(row.querySelector('.pkg-name'));
-        syncDropdown(row.querySelector('.pkg-amount'));
-    });
-    const ps5Body = document.getElementById('ps5Body');
-    ps5Body.innerHTML = '';
-    (s.ps5_sessions || []).forEach(p => {
-        const storedDur = parseInt(p[5]) || 1;
-        const durMax = Math.max(6, storedDur);
-        const durOpts = Array.from({length: durMax},(_,i)=>`<option value="${i+1}" ${storedDur===i+1?'selected':''}>${i+1} hr${i>0?'s':''}</option>`).join('');
-        const isExtended = p[6] ? true : false;
-        const row = document.createElement('tr');
-        row.dataset.state = 'editing';
-        row.dataset.amountManual = p[8] ? 'true' : 'false';
-        row.dataset.isExtended = isExtended ? 'true' : 'false';
-        row.dataset.rowId = p[7] || '';
-        if (p[7] && ps5EndPins[p[7]] != null) row.dataset.endMs = String(ps5EndPins[p[7]]);
-        if (isExtended) row.classList.add('ps5-extended');
-        const extBadge = isExtended ? '<span class="ext-badge">⚡ EXT</span>' : '';
-        const ps5Opts = (config.ps5_numbers || ['Left', 'Right', 'PC']).map(v => `<option value="${v}" ${(p[0]||'')===v?'selected':''}>${v}</option>`).join('');
-        row.innerHTML = `<td><select class="ps5-number" onchange="handlePS5NumberChange(this)">${ps5Opts}</select></td><td><select class="ps5-ctrl" onchange="recalcPS5RowAmount(this); autoCalcPS5()">${[1,2,3,4].map(v => `<option value="${v}" ${p[1]==v?'selected':''}>${v}</option>`).join('')}</select></td><td><input type="time" class="ps5-start" value="${p[2]||''}" onchange="calcPS5EndTime(this); autoCalcPS5()"></td><td><select class="ps5-duration" onchange="recalcPS5RowAmount(this); calcPS5EndTime(this); autoCalcPS5()">${durOpts}</select></td><td><input type="time" class="ps5-end" readonly tabindex="-1" value="${p[3]||''}"></td><td><input type="number" class="ps5-amount" step="0.01" min="0" placeholder="Amount" style="background:rgba(0,0,0,0.2);color:var(--gold);font-weight:700;" onchange="this.closest('tr').dataset.amountManual='true'; this.classList.add('ps5-amount-manual'); autoCalcPS5()"></td><td>${extBadge}</td><td><button class="btn-del-row" onclick="this.closest('tr').remove(); autoCalcPS5(); syncTimerRegistry();">✕</button></td>`;
-        ps5Body.appendChild(row);
-        initCustomDropdowns(row);
-        // A manually entered amount is authoritative — never recompute it away.
-        if (p[8]) {
-            const amtInput = row.querySelector('.ps5-amount');
-            amtInput.value = (parseFloat(p[4]) || 0).toFixed(2);
-            amtInput.classList.add('ps5-amount-manual');
-        } else {
-            recalcPS5RowAmount(row);
+    _isPopulatingForm = true;
+    try {
+        if (s.employee_name) {
+            document.getElementById('employeeSelect').value = s.employee_name;
+            syncDropdown(document.getElementById('employeeSelect'));
         }
-        syncDropdown(row.querySelector('.ps5-ctrl'));
-        syncDropdown(row.querySelector('.ps5-duration'));
-        syncDropdown(row.querySelector('.ps5-number'));
-        if ((p[0]||'') === 'PC') row.classList.add('ps5-pc-row');
-    });
-    renderInventory(s.inventory_items_snapshot || config.inventory_items);
-    if (s.inventory && s.inventory.length > 0) {
-        s.inventory.forEach(inv => {
-            const el = document.querySelector(`.inv-opening[data-item="${escHtml(inv[0])}"]`);
-            if (el) {
-                el.value = inv[1] || 0;
-                const r = el.closest('tr');
-                r.querySelector('.inv-restock').value = inv[2] || 0;
-                r.querySelector('.inv-closing').value = inv[3] || 0;
-                recalcInvSold(r.querySelector('.inv-closing'));
+        if (s.shift_name && s.shift_timing) {
+            const shiftVal = `${s.shift_name} (${s.shift_timing})`;
+            const opt = Array.from(document.getElementById('shiftSelect').options).find(o => o.value === shiftVal);
+            if (opt) document.getElementById('shiftSelect').value = shiftVal;
+            syncDropdown(document.getElementById('shiftSelect'));
+        }
+        const mkPkgRow = (name, amt, hz, hrs) => {
+            const totalPCs = config.total_pcs || 27;
+            const pcOpts = Array.from({length:totalPCs}, (_, i) => `<option value="PC #${i+1}" ${name === `PC #${i+1}` ? 'selected' : ''}>PC #${i+1}</option>`).join('');
+            const targetAmt = parseFloat(amt) || 0;
+            const targetHz = (hz || '').trim();
+            const targetHrs = (hrs || '').trim();
+
+            const pkgOpts = sortPackages(config.packages).map(p => {
+                let isMatch = false;
+                if (targetHz && targetHrs) {
+                    isMatch = (p.hz === targetHz && p.hrs === targetHrs && p.price === targetAmt);
+                } else {
+                    isMatch = (p.price === targetAmt);
+                }
+                return `<option value="${p.hz}|${p.hrs}|${p.price}" data-price="${p.price}" data-hz="${escHtml(p.hz)}" data-hrs="${escHtml(p.hrs)}" ${isMatch ? 'selected' : ''}>${escHtml(p.hz)} ${escHtml(p.hrs)} - PKR ${p.price}</option>`;
+            }).join('');
+            return `<td><select class="pkg-name" onchange="pcNameSelected(this)"><option value="">PC #</option>${pcOpts}</select></td><td><select class="pkg-amount" onchange="recalcTotals()"><option value="">Select Package</option>${pkgOpts}</select></td><td><button class="btn-del-row" onclick="this.closest('tr').remove(); recalcTotals();">✕</button></td>`;
+        };
+        const morningBody = document.getElementById('morningBody');
+        morningBody.innerHTML = '';
+        (s.morning_packages || []).forEach(p => {
+            const row = document.createElement('tr');
+            const pName = Array.isArray(p) ? p[0] : (p.pc_name || '');
+            const pAmt = Array.isArray(p) ? p[1] : (p.amount || 0);
+            const pHz = Array.isArray(p) ? p[2] : (p.hz || '');
+            const pHrs = Array.isArray(p) ? p[3] : (p.hrs || '');
+            row.innerHTML = mkPkgRow(pName, pAmt, pHz, pHrs);
+            morningBody.appendChild(row);
+            initCustomDropdowns(row);
+            initPkgAmountEnter(row, 'morning');
+            syncDropdown(row.querySelector('.pkg-name'));
+            syncDropdown(row.querySelector('.pkg-amount'));
+        });
+        const nighterBody = document.getElementById('nighterBody');
+        nighterBody.innerHTML = '';
+        (s.nighter_packages || []).forEach(p => {
+            const row = document.createElement('tr');
+            const pName = Array.isArray(p) ? p[0] : (p.pc_name || '');
+            const pAmt = Array.isArray(p) ? p[1] : (p.amount || 0);
+            const pHz = Array.isArray(p) ? p[2] : (p.hz || '');
+            const pHrs = Array.isArray(p) ? p[3] : (p.hrs || '');
+            row.innerHTML = mkPkgRow(pName, pAmt, pHz, pHrs);
+            nighterBody.appendChild(row);
+            initCustomDropdowns(row);
+            initPkgAmountEnter(row, 'nighter');
+            syncDropdown(row.querySelector('.pkg-name'));
+            syncDropdown(row.querySelector('.pkg-amount'));
+        });
+        const ps5Body = document.getElementById('ps5Body');
+        ps5Body.innerHTML = '';
+        (s.ps5_sessions || []).forEach(p => {
+            const storedDur = parseInt(p[5]) || 1;
+            const durMax = Math.max(6, storedDur);
+            const durOpts = Array.from({length: durMax},(_,i)=>`<option value="${i+1}" ${storedDur===i+1?'selected':''}>${i+1} hr${i>0?'s':''}</option>`).join('');
+            const isExtended = p[6] ? true : false;
+            const row = document.createElement('tr');
+            row.dataset.state = 'editing';
+            row.dataset.amountManual = p[8] ? 'true' : 'false';
+            row.dataset.isExtended = isExtended ? 'true' : 'false';
+            row.dataset.rowId = p[7] || '';
+            if (p[7] && ps5EndPins[p[7]] != null) row.dataset.endMs = String(ps5EndPins[p[7]]);
+            if (isExtended) row.classList.add('ps5-extended');
+            const extBadge = isExtended ? '<span class="ext-badge">⚡ EXT</span>' : '';
+            const ps5Opts = (config.ps5_numbers || ['Left', 'Right', 'PC']).map(v => `<option value="${v}" ${(p[0]||'')===v?'selected':''}>${v}</option>`).join('');
+            row.innerHTML = `<td><select class="ps5-number" onchange="handlePS5NumberChange(this)">${ps5Opts}</select></td><td><select class="ps5-ctrl" onchange="recalcPS5RowAmount(this); autoCalcPS5()">${[1,2,3,4].map(v => `<option value="${v}" ${p[1]==v?'selected':''}>${v}</option>`).join('')}</select></td><td><input type="time" class="ps5-start" value="${p[2]||''}" onchange="calcPS5EndTime(this); autoCalcPS5()"></td><td><select class="ps5-duration" onchange="recalcPS5RowAmount(this); calcPS5EndTime(this); autoCalcPS5()">${durOpts}</select></td><td><input type="time" class="ps5-end" readonly tabindex="-1" value="${p[3]||''}"></td><td><input type="number" class="ps5-amount" step="0.01" min="0" placeholder="Amount" style="background:rgba(0,0,0,0.2);color:var(--gold);font-weight:700;" onchange="this.closest('tr').dataset.amountManual='true'; this.classList.add('ps5-amount-manual'); autoCalcPS5()"></td><td>${extBadge}</td><td><button class="btn-del-row" onclick="this.closest('tr').remove(); autoCalcPS5(); syncTimerRegistry();">✕</button></td>`;
+            ps5Body.appendChild(row);
+            initCustomDropdowns(row);
+            // A manually entered amount is authoritative — never recompute it away.
+            if (p[8]) {
+                const amtInput = row.querySelector('.ps5-amount');
+                amtInput.value = (parseFloat(p[4]) || 0).toFixed(2);
+                amtInput.classList.add('ps5-amount-manual');
+            } else {
+                recalcPS5RowAmount(row);
             }
+            syncDropdown(row.querySelector('.ps5-ctrl'));
+            syncDropdown(row.querySelector('.ps5-duration'));
+            syncDropdown(row.querySelector('.ps5-number'));
+            if ((p[0]||'') === 'PC') row.classList.add('ps5-pc-row');
         });
-    } else if (lastShift && lastShift.inventory) {
-        lastShift.inventory.forEach(i => {
-            const name = i[0];
-            const closing = parseInt(i[3]) || 0;
-            const el = document.querySelector(`.inv-opening[data-item="${escHtml(name)}"]`);
-            if (el) el.value = closing;
+        renderInventory(s.inventory_items_snapshot || config.inventory_items);
+        if (s.inventory && s.inventory.length > 0) {
+            s.inventory.forEach(inv => {
+                const el = document.querySelector(`.inv-opening[data-item="${escHtml(inv[0])}"]`);
+                if (el) {
+                    el.value = inv[1] || 0;
+                    const r = el.closest('tr');
+                    r.querySelector('.inv-restock').value = inv[2] || 0;
+                    r.querySelector('.inv-closing').value = inv[3] || 0;
+                    recalcInvSold(r.querySelector('.inv-closing'));
+                }
+            });
+        } else if (lastShift && lastShift.inventory) {
+            lastShift.inventory.forEach(i => {
+                const name = i[0];
+                const closing = parseInt(i[3]) || 0;
+                const el = document.querySelector(`.inv-opening[data-item="${escHtml(name)}"]`);
+                if (el) el.value = closing;
+            });
+        }
+        const expenseBody = document.getElementById('expenseBody');
+        expenseBody.innerHTML = '';
+        (s.expenses || []).forEach(e => {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td><input type="text" class="exp-desc" value="${escHtml(e[0]||'')}" oninput="autoCalcExpenses()"></td><td><input type="number" class="exp-amount" value="${parseFloat(e[1]).toFixed(2)}" step="0.01" min="0" oninput="autoCalcExpenses()"></td><td><button class="btn-del-row" onclick="this.closest('tr').remove(); autoCalcExpenses();">✕</button></td>`;
+            expenseBody.appendChild(row);
         });
+        document.getElementById('topupInput').value = s.topup_sale || 0;
+        document.getElementById('cafeteriaInput').value = s.cafeteria_sale || 0;
+        document.getElementById('cashInput').value = s.cash_received || 0;
+        document.getElementById('onlineInput').value = s.online_payments || 0;
+        document.getElementById('actualPosInput').value = s.actual_pos_amount || 0;
+        document.getElementById('totalTaxAmountInput').value = s.total_tax_amount || 0;
+        if (s.pancafe_screenshot_filename) {
+            showScreenshotPreview('/uploads/' + s.pancafe_screenshot_filename);
+        } else {
+            resetScreenshotPreview();
+        }
+        recalcTotals();
+        syncTimerRegistry();
+    } finally {
+        _isPopulatingForm = false;
     }
-    const expenseBody = document.getElementById('expenseBody');
-    expenseBody.innerHTML = '';
-    (s.expenses || []).forEach(e => {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td><input type="text" class="exp-desc" value="${escHtml(e[0]||'')}" oninput="autoCalcExpenses()"></td><td><input type="number" class="exp-amount" value="${parseFloat(e[1]).toFixed(2)}" step="0.01" min="0" oninput="autoCalcExpenses()"></td><td><button class="btn-del-row" onclick="this.closest('tr').remove(); autoCalcExpenses();">✕</button></td>`;
-        expenseBody.appendChild(row);
-    });
-    document.getElementById('topupInput').value = s.topup_sale || 0;
-    document.getElementById('cafeteriaInput').value = s.cafeteria_sale || 0;
-    document.getElementById('cashInput').value = s.cash_received || 0;
-    document.getElementById('onlineInput').value = s.online_payments || 0;
-    document.getElementById('actualPosInput').value = s.actual_pos_amount || 0;
-    document.getElementById('totalTaxAmountInput').value = s.total_tax_amount || 0;
-    if (s.pancafe_screenshot_filename) {
-        showScreenshotPreview('/uploads/' + s.pancafe_screenshot_filename);
-    } else {
-        resetScreenshotPreview();
-    }
-    recalcTotals();
-    syncTimerRegistry();
 }
 
 async function continueShift(shiftId) {
