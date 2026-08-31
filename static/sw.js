@@ -79,9 +79,6 @@ function calcEndTimestamp(endTotalMin) {
     const m = endTotalMin % 60;
     const d = new Date(now);
     d.setHours(h, m, 0, 0);
-    if (d <= new Date(now.getTime() - 60000)) {
-        d.setDate(d.getDate() + 1);
-    }
     return d.getTime();
 }
 

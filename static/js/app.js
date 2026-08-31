@@ -4055,6 +4055,36 @@ function carryOverEligiblePendingToForm() {
     syncTimerRegistry();
 }
 
+/* Computes the exact millisecond target timestamp for a session from its
+   startTime (HH:MM) and durationHours. Anchors to today's dayStart and
+   accurately handles midnight-crossing sessions without 24-hour overshoots. */
+function computePS5SessionEndMs(startTime, durationHours, nowMs = Date.now()) {
+    if (!startTime) return NaN;
+    const parts = startTime.split(':').map(Number);
+    const sh = parts[0];
+    const sm = parts[1];
+    if (!Number.isFinite(sh) || !Number.isFinite(sm) || sh < 0 || sh > 23 || sm < 0 || sm > 59) {
+        return NaN;
+    }
+    const durHrs = parseInt(durationHours) || 1;
+    const durMs = durHrs * 3600000;
+
+    const dayStart = new Date(nowMs);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayStartMs = dayStart.getTime();
+
+    // Tentative start timestamp on today's calendar date
+    let startMs = dayStartMs + (sh * 60 + sm) * 60000;
+
+    // If startMs is in the future by more than 15 minutes, the session started
+    // yesterday (e.g. session started at 23:59 yesterday, and now it's 00:30 AM or 02:00 AM today).
+    if (startMs - nowMs > 15 * 60000) {
+        startMs -= 86400000;
+    }
+
+    return startMs + durMs;
+}
+
 function syncTimerRegistry() {
     ps5TimerSessions = [];
     const body = document.getElementById('ps5Body');
@@ -4074,23 +4104,13 @@ function syncTimerRegistry() {
         const [eh, em] = endTime.split(':').map(Number);
         const endTotalMin = eh * 60 + em;
         const startTotalMin = sh * 60 + sm;
-        // Pin the endDateMs per row on first sync. Recomputing from a fresh
-        // dayStart every pass made a page kept open past midnight flip an
-        // overnight session's end back to "today" (already past → alarm at
-        // midnight instead of its real time). calcPS5EndTime deletes the pin
-        // when start/duration change so re-pinning picks up the new time.
-        // Reloading after midnight re-derives from today's dayStart, which
-        // overshoots crossing-midnight sessions by a full day — sessions never
-        // run >24h, so any computed end more than 23h out is that overshoot.
+        // Pin the endDateMs per row on first sync.
         let endDateMs = parseFloat(row.dataset.endMs) || NaN;
         if (isNaN(endDateMs)) {
-            const dayStart = new Date();
-            dayStart.setHours(0, 0, 0, 0);
-            endDateMs = dayStart.getTime() + (endTotalMin < startTotalMin ? endTotalMin + 1440 : endTotalMin) * 60000;
-            if (endDateMs - Date.now() >= 23 * 3600000) {
-                endDateMs -= 86400000;
+            endDateMs = computePS5SessionEndMs(startTime, duration);
+            if (!isNaN(endDateMs)) {
+                row.dataset.endMs = String(endDateMs);
             }
-            row.dataset.endMs = String(endDateMs);
         }
         const remainingSeconds = Math.max(0, (endDateMs - Date.now()) / 1000);
         let alarmTriggered = row.dataset.alarmTriggered === 'true';
@@ -4331,20 +4351,8 @@ function _recheckDismissedIfChanged() {
             // Only re-arm if the edited row's end is still in the future — a
             // start pulled earlier (end already past) must not re-ring an
             // alarm that already fired and was dismissed.
-            const parts = startTime.split(':').map(Number);
-            const sh = parts[0];
-            const sm = parts[1];
-            if (!Number.isFinite(sh) || !Number.isFinite(sm) || sh < 0 || sh > 23 || sm < 0 || sm > 59) {
-                continue;
-            }
-            const dayStartMs = new Date();
-            dayStartMs.setHours(0, 0, 0, 0);
-            const dayStart = dayStartMs.getTime();
-            const durHrs = parseInt(duration) || 1;
-            const absMin = sh * 60 + sm + durHrs * 60;
-            let endMs = dayStart + absMin * 60000;
-            if (endMs - nowMs >= 23 * 3600000) endMs -= 86400000;
-            if (endMs <= nowMs) continue;
+            const endMs = computePS5SessionEndMs(startTime, duration, nowMs);
+            if (isNaN(endMs) || endMs <= nowMs) continue;
             changed.push(id);
             delete ps5DismissedTimers[id];
             mutated = true;

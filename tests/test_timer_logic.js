@@ -1,4 +1,4 @@
-﻿// Logic tests for the PS5 timer changes — extracts the REAL function sources
+// Logic tests for the PS5 timer changes — extracts the REAL function sources
 // from static/js/app.js and runs them against stubs.
 const fs = require('fs');
 const path = require('path');
@@ -233,6 +233,50 @@ console.log();
     check('dismissedTimerChanged null snapshot -> false', chk(null, '18:00', '1') === false, '');
     check('dismissedTimerChanged coerces string duration', chk({ startTime: '18:00', duration: '1' }, '18:00', '1') === false, '');
     check('dismissedTimerChanged start only differs -> true', chk({ startTime: '20:00', duration: 2 }, '18:00', '2') === true, '');
+}
+
+console.log();
+
+// ── 6. computePS5SessionEndMs (Midnight & Noon boundary testing) ──
+{
+    const computeEndMs = run(extract('computePS5SessionEndMs'));
+    const DS = dayStart();
+
+    // 11:59 AM start, 1 hr duration, tested at 11:58 AM
+    const now1158am = DS + (11 * 60 + 58) * 60000;
+    const end1 = computeEndMs('11:59', 1, now1158am);
+    const rem1 = (end1 - now1158am) / 1000;
+    check('11:59 AM + 1 hr tested at 11:58 AM -> ~61 mins', rem1 === 3660, rem1);
+
+    // 11:59 AM start, 1 hr duration, tested at 12:15 PM
+    const now1215pm = DS + (12 * 60 + 15) * 60000;
+    const end2 = computeEndMs('11:59', 1, now1215pm);
+    const rem2 = (end2 - now1215pm) / 1000;
+    check('11:59 AM + 1 hr tested at 12:15 PM -> 44 mins', rem2 === 44 * 60, rem2);
+
+    // 11:59 AM start, 1 hr duration, tested at 14:00 PM (past end)
+    const now1400pm = DS + (14 * 60) * 60000;
+    const end3 = computeEndMs('11:59', 1, now1400pm);
+    const rem3 = Math.max(0, (end3 - now1400pm) / 1000);
+    check('11:59 AM + 1 hr tested at 14:00 PM -> 0 remaining (ended, no 24h jump)', rem3 === 0, rem3);
+
+    // 23:59 PM start, 1 hr duration, tested at 23:58 PM (before midnight)
+    const now2358pm = DS + (23 * 60 + 58) * 60000;
+    const end4 = computeEndMs('23:59', 1, now2358pm);
+    const rem4 = (end4 - now2358pm) / 1000;
+    check('23:59 PM + 1 hr tested at 23:58 PM -> ~61 mins (into next day)', rem4 === 3660, rem4);
+
+    // 23:59 PM start, 1 hr duration, tested at 00:05 AM (after midnight)
+    const now0005am = DS + (5) * 60000;
+    const end5 = computeEndMs('23:59', 1, now0005am);
+    const rem5 = (end5 - now0005am) / 1000;
+    check('23:59 PM + 1 hr tested at 00:05 AM -> 54 mins (no 24h jump)', rem5 === 54 * 60, rem5);
+
+    // 23:59 PM start, 1 hr duration, tested at 02:00 AM (2h after midnight, past end)
+    const now0200am = DS + (120) * 60000;
+    const end6 = computeEndMs('23:59', 1, now0200am);
+    const rem6 = Math.max(0, (end6 - now0200am) / 1000);
+    check('23:59 PM + 1 hr tested at 02:00 AM -> 0 remaining (ended, no 23h jump)', rem6 === 0, rem6);
 }
 
 const failed = results.filter(r => !r[0]);
