@@ -295,6 +295,39 @@ class GoogleSheetsManager:
         if changed:
             save_shift(shift)
 
+    def _format_expenses_for_sheet(self, shift: ShiftData):
+        """Formats expenses as a multi-line string with each description: amount
+        on its own line and Total at the bottom. Returns 0 if no expenses."""
+        from .models import ExpenseEntry
+        valid_expenses = []
+        for e in (shift.expenses or []):
+            if isinstance(e, ExpenseEntry):
+                desc = (e.description or "").strip()
+                amt = float(e.amount or 0.0)
+            elif isinstance(e, (list, tuple)) and len(e) > 0:
+                desc = str(e[0] or "").strip()
+                amt = float(e[1]) if len(e) > 1 and e[1] is not None else 0.0
+            elif isinstance(e, dict):
+                desc = str(e.get("description", "")).strip()
+                amt = float(e.get("amount", 0.0) or 0.0)
+            else:
+                continue
+            if desc or amt > 0:
+                valid_expenses.append((desc or "Expense", amt))
+
+        if valid_expenses:
+            exp_lines = []
+            for desc, amt in valid_expenses:
+                amt_str = f"{int(amt)}" if amt == int(amt) else f"{amt:.2f}"
+                exp_lines.append(f"{desc}: {amt_str}")
+            tot = float(shift.total_expenses or sum(a for _, a in valid_expenses))
+            tot_str = f"{int(tot)}" if tot == int(tot) else f"{tot:.2f}"
+            exp_lines.append(f"Total: {tot_str}")
+            return "\n".join(exp_lines)
+
+        tot = float(shift.total_expenses or 0.0)
+        return f"{int(tot)}" if tot == int(tot) else (f"{tot:.2f}" if tot > 0 else 0)
+
     def _append_summary(self, wb, shift: ShiftData, ordered: bool = False):
         ws = wb.worksheet(SUMMARY_SHEET_NAME)
 
@@ -376,6 +409,7 @@ class GoogleSheetsManager:
 
             inv_parts = [f"{i.name}: {i.closing_stock}" for i in shift.inventory]
             inv_str = ", ".join(inv_parts) if inv_parts else "None"
+            exp_str = self._format_expenses_for_sheet(shift)
 
             total_sale = shift.grand_total
             total_payment = shift.cash_received + shift.online_payments + shift.actual_pos_amount
@@ -390,7 +424,7 @@ class GoogleSheetsManager:
                 total_sale,
                 shift.online_payments, shift.cash_received, shift.actual_pos_amount,
                 total_payment,
-                shift.total_expenses,
+                exp_str,
                 reconciliation,
                 grand_total_net,
                 shift.total_tax_amount,

@@ -22,7 +22,7 @@ SHEET 1: "Shift Summary"  (26 columns, one row per shift)
 13  Cash Received
 14  Actual POS Amount
 15  Total Payment Received   = cash + online + pos (computed)
-16  Total Expenses
+16  Total Expenses           = Detailed multiline list of expenses + Total (or 0 if none)
 17  Reconciliation           = Total - Total Payment - Total Expenses (computed)
 18  Grand Total              = Total - Total Expenses (net; computed)
 19  Total TAX Amount
@@ -38,7 +38,7 @@ Row values appended (in order):
 shift_id, date, day, shift_timing, employee_name, topup_sale,
 morning_pkg_total, nighter_pkg_total, ps5_total, cafeteria_sale,
 total_sale, online_payments, cash_received, actual_pos_amount,
-total_payment, total_expenses, reconciliation, grand_total_net,
+total_payment, exp_str, reconciliation, grand_total_net,
 total_tax_amount, len(morning_packages), len(nighter_packages),
 len(ps5_sessions), inv_str, closed_at, pancafe_url, form_url
 
