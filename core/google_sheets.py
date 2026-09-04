@@ -4,6 +4,7 @@ import threading
 from typing import Optional, Callable
 from config import UPLOAD_DIR, BASE_URL
 from .local_cache import save_shift
+from .models import ShiftData, ExpenseEntry
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CREDENTIALS_FILE = os.path.join(ROOT_DIR, "credentials.json")
@@ -298,7 +299,6 @@ class GoogleSheetsManager:
     def _format_expenses_for_sheet(self, shift: ShiftData):
         """Formats expenses as a multi-line string with each description: amount
         on its own line and Total at the bottom. Returns 0 if no expenses."""
-        from .models import ExpenseEntry
         valid_expenses = []
         for e in (shift.expenses or []):
             if isinstance(e, ExpenseEntry):
