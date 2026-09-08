@@ -29,8 +29,11 @@ def load_shift(shift_id: str) -> Optional[ShiftData]:
     path = os.path.join(LOCAL_DATA_DIR, f"shift_{shift_id}.json")
     if not os.path.exists(path):
         return None
-    with open(path) as f:
-        return ShiftData.from_dict(json.load(f))
+    try:
+        with open(path) as f:
+            return ShiftData.from_dict(json.load(f))
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def get_all_shifts() -> List[ShiftData]:
@@ -39,8 +42,11 @@ def get_all_shifts() -> List[ShiftData]:
     for fname in os.listdir(LOCAL_DATA_DIR):
         if fname.startswith("shift_") and fname.endswith(".json"):
             path = os.path.join(LOCAL_DATA_DIR, fname)
-            with open(path) as f:
-                shifts.append(ShiftData.from_dict(json.load(f)))
+            try:
+                with open(path) as f:
+                    shifts.append(ShiftData.from_dict(json.load(f)))
+            except (json.JSONDecodeError, OSError):
+                continue
     shifts.sort(key=lambda s: s.opened_at or "", reverse=True)
     return shifts
 
@@ -67,12 +73,25 @@ def get_last_shift() -> Optional[ShiftData]:
         return shifts[0]
     return None
 
+def get_all_active_shifts() -> List[ShiftData]:
+    return [s for s in get_all_shifts() if s.status == "active"]
+
+
 def get_last_active_shift() -> Optional[ShiftData]:
-    shifts = get_all_shifts()
-    for s in shifts:
-        if s.status == "active":
-            return s
-    return None
+    active = get_all_active_shifts()
+    if not active:
+        return None
+    if len(active) > 1:
+        for stale in active[1:]:
+            stale.status = "closed"
+            if not stale.closed_at:
+                stale.closed_at = stale.opened_at or time.strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                save_shift(stale)
+                print(f"[RECOVERY] Auto-closed duplicate/stale active shift {stale.shift_id} (superseded by {active[0].shift_id})")
+            except Exception as e:
+                print(f"[WARNING] Failed to heal duplicate active shift {stale.shift_id}: {e}")
+    return active[0]
 
 
 SYNC_ERRORS_FILE = os.path.join(LOCAL_DATA_DIR, "sync_errors.jsonl")

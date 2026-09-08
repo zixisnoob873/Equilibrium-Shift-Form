@@ -242,45 +242,46 @@ def get_session():
 
 @app.route("/api/shift/start", methods=["POST"])
 def start_shift():
-    data = request.get_json()
+    data = request.get_json() or {}
     employee_name = data.get("employee_name", "").strip()
     if not employee_name:
         return jsonify({"success": False, "error": "Employee name required"}), 400
 
-    existing = shift_manager.current_shift or get_last_active_shift()
-    if existing:
-        return jsonify({
-            "success": False,
-            "error": f"A shift by {existing.employee_name} is already active. Close it before starting a new one."
-        }), 409
+    with shift_manager._start_lock:
+        existing = shift_manager.current_shift or get_last_active_shift()
+        if existing:
+            return jsonify({
+                "success": False,
+                "error": f"A shift by {existing.employee_name} is already active. Close it before starting a new one."
+            }), 409
 
-    cfg = get_effective_config()
-    shift = shift_manager.start_new_shift(employee_name)
-    shift.inventory_items_snapshot = cfg["inventory_items"][:]
+        cfg = get_effective_config()
+        shift = shift_manager.start_new_shift(employee_name)
+        shift.inventory_items_snapshot = cfg["inventory_items"][:]
 
-    last = get_last_closed_shift()
-    closing_map = {}
-    if last and last.inventory:
-        for item in last.inventory:
-            if isinstance(item, InventoryItem):
-                closing_map[item.name] = item.closing_stock
-            elif isinstance(item, (list, tuple)) and len(item) >= 4:
-                closing_map[item[0]] = int(item[3]) if item[3] is not None else 0
-            elif isinstance(item, dict):
-                closing_map[item.get("name", "")] = int(item.get("closing_stock", 0))
+        last = get_last_closed_shift()
+        closing_map = {}
+        if last and last.inventory:
+            for item in last.inventory:
+                if isinstance(item, InventoryItem):
+                    closing_map[item.name] = item.closing_stock
+                elif isinstance(item, (list, tuple)) and len(item) >= 4:
+                    closing_map[item[0]] = int(item[3]) if item[3] is not None else 0
+                elif isinstance(item, dict):
+                    closing_map[item.get("name", "")] = int(item.get("closing_stock", 0))
 
-    shift.inventory = [
-        InventoryItem(
-            name=item_name,
-            opening_stock=closing_map.get(item_name, 0),
-            restock_qty=0,
-            closing_stock=0
-        )
-        for item_name in shift.inventory_items_snapshot
-    ]
+        shift.inventory = [
+            InventoryItem(
+                name=item_name,
+                opening_stock=closing_map.get(item_name, 0),
+                restock_qty=0,
+                closing_stock=0
+            )
+            for item_name in shift.inventory_items_snapshot
+        ]
 
-    save_shift(shift)
-    return jsonify({"success": True, "shift": shift.to_dict(), "last_shift": last.to_dict() if last else None})
+        save_shift(shift)
+        return jsonify({"success": True, "shift": shift.to_dict(), "last_shift": last.to_dict() if last else None})
 
 
 

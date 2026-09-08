@@ -14,6 +14,7 @@ class ShiftManager:
         self.sheets = GoogleSheetsManager()
         self._listeners = []
         self._closing_ids: Set[str] = set()
+        self._start_lock = threading.Lock()
 
     def is_closing(self, shift_id: str) -> bool:
         return shift_id in self._closing_ids

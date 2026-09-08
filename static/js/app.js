@@ -514,6 +514,42 @@ class TabCoordinator {
                 }
                 break;
 
+            case 'SHIFT_STARTING':
+                if (msg.tabId !== this.tabId && (!currentShift || !currentShift.shift_id)) {
+                    const startBtn = document.getElementById('startShiftBtn');
+                    if (startBtn) {
+                        startBtn.disabled = true;
+                        startBtn.innerHTML = '<span class="spinner"></span> Starting in another tab...';
+                    }
+                }
+                break;
+
+            case 'SHIFT_START_FAILED':
+                if (msg.tabId !== this.tabId && (!currentShift || !currentShift.shift_id)) {
+                    const startBtn = document.getElementById('startShiftBtn');
+                    if (startBtn) {
+                        startBtn.disabled = false;
+                        startBtn.innerHTML = '<span class="btn-icon">🚀</span> Start New Shift';
+                    }
+                }
+                break;
+
+            case 'SHIFT_STARTED':
+                if (msg.tabId !== this.tabId) {
+                    this.shiftId = msg.shift ? msg.shift.shift_id : null;
+                    this.isActive = false;
+                    this._stopHeartbeat();
+                    if (msg.shift) {
+                        currentShift = msg.shift;
+                        setStatus('active', `Shift Active - ${currentShift.employee_name || ''}`);
+                        populateFormFromShift(currentShift);
+                        toggleFormMode();
+                    }
+                    this._showLock();
+                    showToast('A new shift was started in another tab.', 'info');
+                }
+                break;
+
             case 'DRAFT_UPDATED':
                 // Handle both active shift drafts and pre-start drafts
                 const isPreStartDraft = msg.shiftId === 'new';
@@ -627,6 +663,15 @@ class TabCoordinator {
 
         this._takeoverBtn.disabled = false;
         this._takeoverBtn.innerHTML = '<span class="btn-icon">⚡</span> Continue on this tab anyway';
+    }
+
+    notifyShiftStarted(shift) {
+        if (!this.channel) return;
+        this.channel.postMessage({
+            type: 'SHIFT_STARTED',
+            tabId: this.tabId,
+            shift: shift
+        });
     }
 
     deactivate() {
@@ -1232,7 +1277,11 @@ function handleClosedStartNew() {
     showFormView();
 }
 
+let _isStartingShift = false;
+
 async function startNewShift() {
+    if (_isStartingShift) return;
+
     if (currentShift && currentShift.shift_id) {
         showToast('A shift is already active. Close it before starting a new one.', 'error');
         return;
@@ -1242,6 +1291,16 @@ async function startNewShift() {
     if (!employee) {
         showToast('Please select an employee name first', 'error');
         return;
+    }
+
+    const startBtn = document.getElementById('startShiftBtn');
+    _isStartingShift = true;
+    if (startBtn) {
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<span class="spinner"></span> Starting Shift...';
+    }
+    if (tabCoordinator && tabCoordinator.channel) {
+        tabCoordinator.channel.postMessage({ type: 'SHIFT_STARTING', tabId: tabCoordinator.tabId });
     }
 
     try {
@@ -1287,13 +1346,28 @@ async function startNewShift() {
             document.getElementById('employeeSelect').value = employee;
             syncDropdown(document.getElementById('employeeSelect'));
             showFormView();
-            if (tabCoordinator) tabCoordinator.activate(currentShift.shift_id);
+            if (tabCoordinator) {
+                tabCoordinator.notifyShiftStarted(currentShift);
+                tabCoordinator.activate(currentShift.shift_id);
+            }
             triggerAutoSave();
         } else {
             showToast(data.error || 'Failed to start shift', 'error');
+            if (tabCoordinator && tabCoordinator.channel) {
+                tabCoordinator.channel.postMessage({ type: 'SHIFT_START_FAILED', tabId: tabCoordinator.tabId });
+            }
         }
     } catch (e) {
         showToast('Server error. Is the backend running?', 'error');
+        if (tabCoordinator && tabCoordinator.channel) {
+            tabCoordinator.channel.postMessage({ type: 'SHIFT_START_FAILED', tabId: tabCoordinator.tabId });
+        }
+    } finally {
+        _isStartingShift = false;
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.innerHTML = '<span class="btn-icon">🚀</span> Start New Shift';
+        }
     }
 }
 
