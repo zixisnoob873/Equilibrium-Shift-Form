@@ -407,7 +407,23 @@ class GoogleSheetsManager:
                     date_fallback=1, closed_fallback=23
                 )
 
-            inv_parts = [f"{i.name}: {i.closing_stock}" for i in shift.inventory]
+            def _inv_sort_key(item):
+                if hasattr(item, "name"):
+                    return str(item.name or "").strip().casefold()
+                if isinstance(item, (list, tuple)) and len(item) > 0:
+                    return str(item[0] or "").strip().casefold()
+                if isinstance(item, dict):
+                    return str(item.get("name") or "").strip().casefold()
+                return str(item or "").strip().casefold()
+
+            inv_parts = []
+            for i in sorted(shift.inventory or [], key=_inv_sort_key):
+                if hasattr(i, "name") and hasattr(i, "closing_stock"):
+                    inv_parts.append(f"{i.name}: {i.closing_stock}")
+                elif isinstance(i, (list, tuple)) and len(i) >= 4:
+                    inv_parts.append(f"{i[0]}: {i[3]}")
+                elif isinstance(i, dict):
+                    inv_parts.append(f"{i.get('name', '')}: {i.get('closing_stock', 0)}")
             inv_str = ", ".join(inv_parts) if inv_parts else "None"
             exp_str = self._format_expenses_for_sheet(shift)
 

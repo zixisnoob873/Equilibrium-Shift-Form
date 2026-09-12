@@ -127,6 +127,8 @@ def load_settings():
         except (json.JSONDecodeError, OSError) as e:
             print(f"  Warning: settings.json corrupted ({e}), using defaults")
             return {"employees": DEFAULT_EMPLOYEES[:], "inventory_items": DEFAULT_INVENTORY[:], "packages": DEFAULT_PACKAGES[:], "ps5_pricing": DEFAULT_PS5_PRICING.copy(), "ps5_numbers": ["Left", "Right", "PC"], "total_pcs": DEFAULT_TOTAL_PCS, "employee_pins": {}}
+        if "inventory_items" in data and isinstance(data["inventory_items"], list):
+            data["inventory_items"] = sorted(data["inventory_items"], key=lambda s: str(s).strip().casefold())
         if "packages" not in data:
             data["packages"] = DEFAULT_PACKAGES[:]
             save_settings(data)
@@ -181,9 +183,10 @@ def _lookup_package_by_amount(amount):
 
 def get_effective_config():
     settings = load_settings()
+    raw_inv = settings.get("inventory_items", DEFAULT_INVENTORY[:]) or []
     return {
         "employees": settings["employees"],
-        "inventory_items": settings["inventory_items"],
+        "inventory_items": sorted(raw_inv, key=lambda s: str(s).strip().casefold()),
         "packages": settings.get("packages", DEFAULT_PACKAGES[:]),
         "ps5_pricing": settings.get("ps5_pricing", DEFAULT_PS5_PRICING.copy()),
         "ps5_numbers": settings.get("ps5_numbers", ["Left", "Right", "PC"]),
@@ -257,23 +260,31 @@ def start_shift():
 
         cfg = get_effective_config()
         shift = shift_manager.start_new_shift(employee_name)
-        shift.inventory_items_snapshot = cfg["inventory_items"][:]
+        shift.inventory_items_snapshot = sorted(cfg["inventory_items"][:], key=lambda s: str(s).strip().casefold())
 
         last = get_last_closed_shift()
         closing_map = {}
         if last and last.inventory:
             for item in last.inventory:
                 if isinstance(item, InventoryItem):
-                    closing_map[item.name] = item.closing_stock
+                    nm = item.name or ""
+                    closing_map[nm] = item.closing_stock
+                    closing_map[nm.strip().casefold()] = item.closing_stock
                 elif isinstance(item, (list, tuple)) and len(item) >= 4:
-                    closing_map[item[0]] = int(item[3]) if item[3] is not None else 0
+                    nm = str(item[0] or "")
+                    val = int(item[3]) if item[3] is not None else 0
+                    closing_map[nm] = val
+                    closing_map[nm.strip().casefold()] = val
                 elif isinstance(item, dict):
-                    closing_map[item.get("name", "")] = int(item.get("closing_stock", 0))
+                    nm = str(item.get("name", "") or "")
+                    val = int(item.get("closing_stock", 0))
+                    closing_map[nm] = val
+                    closing_map[nm.strip().casefold()] = val
 
         shift.inventory = [
             InventoryItem(
                 name=item_name,
-                opening_stock=closing_map.get(item_name, 0),
+                opening_stock=closing_map.get(item_name, closing_map.get(item_name.strip().casefold(), 0)),
                 restock_qty=0,
                 closing_stock=0
             )
@@ -711,6 +722,14 @@ def handle_settings():
     inventory_items = data.get("inventory_items", DEFAULT_INVENTORY)
     if not isinstance(inventory_items, list) or not all(isinstance(i, str) for i in inventory_items):
         return jsonify({"success": False, "error": "inventory_items must be a list of strings"}), 400
+    seen_inv = set()
+    deduped_inv = []
+    for item in inventory_items:
+        clean = item.strip()
+        if clean and clean.casefold() not in seen_inv:
+            seen_inv.add(clean.casefold())
+            deduped_inv.append(clean)
+    inventory_items = sorted(deduped_inv, key=lambda s: s.casefold())
     packages = data.get("packages", DEFAULT_PACKAGES)
     if not isinstance(packages, list) or not all(isinstance(p, dict) and "hz" in p and "hrs" in p and "price" in p for p in packages):
         return jsonify({"success": False, "error": "packages must be a list of {hz, hrs, price} objects"}), 400

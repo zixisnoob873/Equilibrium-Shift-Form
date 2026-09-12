@@ -279,6 +279,31 @@ console.log();
     check('23:59 PM + 1 hr tested at 02:00 AM -> 0 remaining (ended, no 23h jump)', rem6 === 0, rem6);
 }
 
+// --- Section 5: sortInventoryItems logic tests ---
+{
+    const sortInv = run(extract('sortInventoryItems'));
+    
+    // 1. Simple strings
+    const res1 = sortInv(['Water', 'Sting', 'Apples', 'Bananas']);
+    check('sortInventoryItems sorts strings alphabetically', JSON.stringify(res1) === JSON.stringify(['Apples', 'Bananas', 'Sting', 'Water']), res1);
+
+    // 2. Case-insensitive sorting
+    const res2 = sortInv(['water', 'Apples', 'STING', 'bananas']);
+    check('sortInventoryItems sorts case-insensitively', JSON.stringify(res2.map(s => s.toLowerCase())) === JSON.stringify(['apples', 'bananas', 'sting', 'water']), res2);
+
+    // 3. Object array with .name
+    const res3 = sortInv([{name: 'Water', stock: 5}, {name: 'Apples', stock: 10}, {name: 'Sting', stock: 2}]);
+    check('sortInventoryItems sorts object array with .name', JSON.stringify(res3.map(o => o.name)) === JSON.stringify(['Apples', 'Sting', 'Water']), res3);
+
+    // 4. Tuples [name, opening, restock, closing]
+    const res4 = sortInv([['Water', 1, 0, 1], ['Apples', 5, 2, 3], ['Sting', 10, 0, 5]]);
+    check('sortInventoryItems sorts tuple inventory array', JSON.stringify(res4.map(t => t[0])) === JSON.stringify(['Apples', 'Sting', 'Water']), res4);
+
+    // 5. Handles empty/null/non-array gracefully
+    const res5 = sortInv(null);
+    check('sortInventoryItems handles null without crashing', Array.isArray(res5) && res5.length === 0, res5);
+}
+
 const failed = results.filter(r => !r[0]);
 console.log(failed.length === 0 ? 'RESULT: ALL PASS (' + results.length + ' checks)' : 'RESULT: ' + failed.length + ' FAILED');
 process.exit(failed.length === 0 ? 0 : 1);

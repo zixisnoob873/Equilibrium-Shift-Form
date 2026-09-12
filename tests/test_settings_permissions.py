@@ -19,7 +19,7 @@ class TestSettingsPermissions(unittest.TestCase):
         
         self.initial_data = {
             'employees': ['Rafay', 'Jahanzaib Khan', 'Test Employee'],
-            'inventory_items': ['Water', 'Lays', 'Sting'],
+            'inventory_items': ['Lays', 'Sting', 'Water'],
             'packages': [
                 {'hz': '180Hz', 'hrs': '1hrs', 'price': 100},
                 {'hz': '240Hz', 'hrs': '2hrs', 'price': 250}
@@ -55,7 +55,7 @@ class TestSettingsPermissions(unittest.TestCase):
         self.assertNotIn('admin_pins', data)
         self.assertNotIn('employee_pins', data)
         self.assertIn('inventory_items', data)
-        self.assertEqual(data['inventory_items'], ['Water', 'Lays', 'Sting'])
+        self.assertEqual(data['inventory_items'], ['Lays', 'Sting', 'Water'])
 
     def test_update_inventory_without_admin_auth_succeeds(self):
         payload = {
@@ -88,7 +88,7 @@ class TestSettingsPermissions(unittest.TestCase):
     def test_update_packages_without_admin_auth_fails(self):
         payload = {
             'employees': ['Rafay', 'Jahanzaib Khan', 'Test Employee'],
-            'inventory_items': ['Water', 'Lays', 'Sting'],
+            'inventory_items': ['Lays', 'Sting', 'Water'],
             'packages': [
                 {'hz': '180Hz', 'hrs': '1hrs', 'price': 100},
                 {'hz': '240Hz', 'hrs': '2hrs', 'price': 250},
@@ -110,7 +110,7 @@ class TestSettingsPermissions(unittest.TestCase):
     def test_update_employees_without_admin_auth_fails(self):
         payload = {
             'employees': ['Rafay', 'Jahanzaib Khan', 'Hacker'],
-            'inventory_items': ['Water', 'Lays', 'Sting'],
+            'inventory_items': ['Lays', 'Sting', 'Water'],
             'packages': [
                 {'hz': '180Hz', 'hrs': '1hrs', 'price': 100},
                 {'hz': '240Hz', 'hrs': '2hrs', 'price': 250}
@@ -131,7 +131,7 @@ class TestSettingsPermissions(unittest.TestCase):
     def test_update_ps5_pricing_without_admin_auth_fails(self):
         payload = {
             'employees': ['Rafay', 'Jahanzaib Khan', 'Test Employee'],
-            'inventory_items': ['Water', 'Lays', 'Sting'],
+            'inventory_items': ['Lays', 'Sting', 'Water'],
             'packages': [
                 {'hz': '180Hz', 'hrs': '1hrs', 'price': 100},
                 {'hz': '240Hz', 'hrs': '2hrs', 'price': 250}
@@ -156,7 +156,7 @@ class TestSettingsPermissions(unittest.TestCase):
 
         payload = {
             'employees': ['Rafay', 'Jahanzaib Khan', 'New Staff Member'],
-            'inventory_items': ['Water', 'Lays', 'Sting'],
+            'inventory_items': ['Lays', 'Sting', 'Water'],
             'packages': [
                 {'hz': '180Hz', 'hrs': '1hrs', 'price': 120}
             ],
@@ -176,6 +176,35 @@ class TestSettingsPermissions(unittest.TestCase):
         self.assertTrue(data['success'])
         self.assertEqual(data['total_pcs'], 30)
         self.assertEqual(data['employees'], ['Rafay', 'Jahanzaib Khan', 'New Staff Member'])
+
+    def test_inventory_items_sorted_alphabetically_on_save(self):
+        payload = {
+            'employees': ['Rafay', 'Jahanzaib Khan', 'Test Employee'],
+            'inventory_items': ['Water', 'Apples', 'Sting', 'Bananas', 'Lays'],
+            'packages': [
+                {'hz': '180Hz', 'hrs': '1hrs', 'price': 100},
+                {'hz': '240Hz', 'hrs': '2hrs', 'price': 250}
+            ],
+            'ps5_pricing': {
+                'two_controllers_first_hour': 700,
+                'one_controller_first_hour': 400,
+                'two_controllers_extended': 500,
+                'one_controller_extended': 300,
+                'ps5_pc_rate': 250
+            },
+            'ps5_numbers': ['Left', 'Right', 'PC'],
+            'total_pcs': 27
+        }
+        res = self.client.post('/api/settings', json=payload)
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        expected = ['Apples', 'Bananas', 'Lays', 'Sting', 'Water']
+        self.assertEqual(data['inventory_items'], expected)
+
+        # Verify persisted on disk is also sorted
+        with open(server.SETTINGS_FILE, 'r') as f:
+            persisted = json.load(f)
+        self.assertEqual(persisted['inventory_items'], expected)
 
 if __name__ == '__main__':
     unittest.main()

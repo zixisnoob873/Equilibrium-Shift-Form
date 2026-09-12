@@ -773,11 +773,21 @@ function sortPackages(pkgs) {
     });
 }
 
+function sortInventoryItems(items) {
+    if (!Array.isArray(items)) return [];
+    return items.slice().sort((a, b) => {
+        const nameA = String(typeof a === 'string' ? a : (a && (a.name || a.item_name)) || (Array.isArray(a) ? a[0] : '') || '').trim();
+        const nameB = String(typeof b === 'string' ? b : (b && (b.name || b.item_name)) || (Array.isArray(b) ? b[0] : '') || '').trim();
+        return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    });
+}
+
 async function loadConfig() {
     try {
         const res = await fetch('/api/config');
         config = await res.json();
         if (config.packages) config.packages = sortPackages(config.packages);
+        if (config.inventory_items) config.inventory_items = sortInventoryItems(config.inventory_items);
         document.getElementById('dateDisplay').textContent = `${config.current_date} | ${config.current_day}`;
         autoSelectShift();
         populateEmployeeSelects();
@@ -1619,10 +1629,11 @@ function autoCalcExpenses() {
 function renderInventory(items) {
     const body = document.getElementById('inventoryBody');
     body.innerHTML = '';
-    const list = items || config.inventory_items;
+    const list = sortInventoryItems(items || config.inventory_items || []);
     list.forEach(item => {
+        const itemName = String(typeof item === 'string' ? item : (item && (item.name || (Array.isArray(item) ? item[0] : ''))) || '').trim();
+        const safeItem = escHtml(itemName);
         const row = document.createElement('tr');
-        const safeItem = escHtml(item);
         row.innerHTML = `
             <td><span style="font-size:13px;color:var(--text);font-weight:500;">${safeItem}</span></td>
             <td><input type="number" class="inv-opening" data-item="${safeItem}" value="0" min="0" style="width:80px;" oninput="recalcInvSold(this)"></td>
@@ -2247,22 +2258,30 @@ function populateFormFromShift(s) {
             if ((p[0]||'') === 'PC') row.classList.add('ps5-pc-row');
         });
         renderInventory(s.inventory_items_snapshot || config.inventory_items);
+        const invOpeningMap = {};
+        document.querySelectorAll('#inventoryBody tr .inv-opening').forEach(inp => {
+            if (inp.dataset && inp.dataset.item) {
+                invOpeningMap[inp.dataset.item] = inp;
+                invOpeningMap[inp.dataset.item.trim().toLowerCase()] = inp;
+            }
+        });
         if (s.inventory && s.inventory.length > 0) {
             s.inventory.forEach(inv => {
-                const el = document.querySelector(`.inv-opening[data-item="${escHtml(inv[0])}"]`);
+                const invName = String(Array.isArray(inv) ? inv[0] : (inv && inv.name) || '');
+                const el = invOpeningMap[invName] || invOpeningMap[invName.trim().toLowerCase()];
                 if (el) {
-                    el.value = inv[1] || 0;
+                    el.value = (Array.isArray(inv) ? inv[1] : inv.opening_stock) || 0;
                     const r = el.closest('tr');
-                    r.querySelector('.inv-restock').value = inv[2] || 0;
-                    r.querySelector('.inv-closing').value = inv[3] || 0;
+                    r.querySelector('.inv-restock').value = (Array.isArray(inv) ? inv[2] : inv.restock_qty) || 0;
+                    r.querySelector('.inv-closing').value = (Array.isArray(inv) ? inv[3] : inv.closing_stock) || 0;
                     recalcInvSold(r.querySelector('.inv-closing'));
                 }
             });
         } else if (lastShift && lastShift.inventory) {
             lastShift.inventory.forEach(i => {
-                const name = i[0];
-                const closing = parseInt(i[3]) || 0;
-                const el = document.querySelector(`.inv-opening[data-item="${escHtml(name)}"]`);
+                const name = String(Array.isArray(i) ? i[0] : (i && i.name) || '');
+                const closing = parseInt(Array.isArray(i) ? i[3] : (i && i.closing_stock) || 0, 10) || 0;
+                const el = invOpeningMap[name] || invOpeningMap[name.trim().toLowerCase()];
                 if (el) el.value = closing;
             });
         }
@@ -2480,6 +2499,7 @@ function renderClosedShiftView(s) {
         if (!invList.length) {
             invEl.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:12px 16px;">No inventory tracked for this shift.</div>';
         } else {
+            const sortedInvList = sortInventoryItems(invList);
             let invHtml = `
             <table class="inv-detail-table">
                 <thead>
@@ -2492,7 +2512,7 @@ function renderClosedShiftView(s) {
                     </tr>
                 </thead>
                 <tbody>`;
-            invList.forEach(i => {
+            sortedInvList.forEach(i => {
                 if (!i) return;
                 const itemName = Array.isArray(i) ? i[0] : (i.name || i.item_name || '');
                 const opening = parseInt(Array.isArray(i) ? i[1] : (i.opening || 0), 10) || 0;
@@ -2937,6 +2957,7 @@ async function openSettings() {
         if (!res.ok) { showToast('Failed to load settings','error'); return; }
         settingsData = await res.json();
         if (settingsData.packages) settingsData.packages = sortPackages(settingsData.packages);
+        if (settingsData.inventory_items) settingsData.inventory_items = sortInventoryItems(settingsData.inventory_items);
         _settingsSnapshot = JSON.parse(JSON.stringify(settingsData));
         renderSettings();
     } catch(e) { showToast('Failed to load settings','error'); }
@@ -3560,8 +3581,16 @@ function addInventoryItem() {
     const inp = document.getElementById('newItemInput');
     const n = inp.value.trim();
     if (!n) { showToast('Enter an item name','error'); return; }
-    if (settingsData.inventory_items.includes(n)) { showToast('Already exists','error'); return; }
-    settingsData.inventory_items.push(n); inp.value=''; renderSettings(); showToast(`Added: ${n}`,'success');
+    if (!settingsData.inventory_items) settingsData.inventory_items = [];
+    if (settingsData.inventory_items.some(i => i.trim().toLowerCase() === n.toLowerCase())) {
+        showToast('Already exists','error');
+        return;
+    }
+    settingsData.inventory_items.push(n);
+    settingsData.inventory_items = sortInventoryItems(settingsData.inventory_items);
+    inp.value='';
+    renderSettings();
+    showToast(`Added: ${n}`,'success');
 }
 
 async function addPackage() {
@@ -3728,6 +3757,7 @@ async function saveSettings() {
     delete settingsData.admin_pins;
     delete settingsData.admin_name;
     delete settingsData.admin_pin;
+    settingsData.inventory_items = sortInventoryItems(settingsData.inventory_items || []);
     try {
         const res = await fetch('/api/settings', {
             method:'POST', headers:{'Content-Type':'application/json', ..._authHeaders()},
@@ -3737,7 +3767,7 @@ async function saveSettings() {
         const data = await res.json();
         if (data.success) {
             config.employees = data.employees;
-            config.inventory_items = data.inventory_items;
+            config.inventory_items = sortInventoryItems(data.inventory_items || []);
             config.packages = data.packages || [];
             config.ps5_pricing = data.ps5_pricing || {};
             config.ps5_numbers = data.ps5_numbers || ['Left', 'Right', 'PC'];
@@ -3755,8 +3785,15 @@ async function saveSettings() {
                 });
                 currentShift.inventory_items_snapshot = data.inventory_items;
                 renderInventory(data.inventory_items);
+                const openingInputs = {};
+                document.querySelectorAll('#inventoryBody tr .inv-opening').forEach(inp => {
+                    if (inp.dataset && inp.dataset.item) {
+                        openingInputs[inp.dataset.item] = inp;
+                        openingInputs[inp.dataset.item.trim().toLowerCase()] = inp;
+                    }
+                });
                 Object.entries(oldValues).forEach(([name, vals]) => {
-                    const opening = document.querySelector(`.inv-opening[data-item="${escHtml(name)}"]`);
+                    const opening = openingInputs[name] || openingInputs[name.trim().toLowerCase()];
                     if (opening) {
                         opening.value = vals.opening;
                         const row = opening.closest('tr');
