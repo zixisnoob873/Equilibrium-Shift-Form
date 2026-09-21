@@ -37,6 +37,7 @@ dist/
 GamingZoneShiftSetup.exe
 Equilibrium-Shift-Form.exe
 *Shift-Form-Installer.exe
+*.spec
 
 # --- IDE & OS Files ---
 .vscode/

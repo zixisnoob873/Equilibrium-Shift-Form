@@ -43,6 +43,11 @@ if not exist ".git" (
 
 :: 3. Pull latest changes from GitHub
 echo [1/2] Fetching latest changes from GitHub...
+:: Clean temporary or machine-specific PyInstaller spec files so they never block git pull
+if exist "*.spec" (
+    git checkout HEAD -- *.spec >nul 2>&1
+    del /f /q *.spec >nul 2>&1
+)
 git pull origin main
 if %ERRORLEVEL% neq 0 (
     echo.
