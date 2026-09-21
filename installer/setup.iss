@@ -5,7 +5,7 @@
 #define MyAppVersion "2.0.0"
 #define MyAppPublisher "Equilibrium Gaming"
 #define MyAppURL "https://github.com/zixisnoob873/Equilibrium-Shift-Form"
-#define MyAppExeName "GamingZoneShift.exe"
+#define MyAppExeName "Equilibrium-Shift-Form.exe"
 
 [Setup]
 AppId={{D37E84B1-29FA-4F62-8E37-B3C57F0C8E19}
@@ -15,11 +15,11 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={autopf}\GamingZoneShift
+DefaultDirName={autopf}\EquilibriumShiftForm
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=output
-OutputBaseFilename=GamingZoneShiftSetup
+OutputBaseFilename=Equilibrium-Shift-Form-Installer
 SetupIconFile=..\assets\installer_icon.ico
 Compression=lzma2/max
 SolidCompression=yes
@@ -38,7 +38,7 @@ Name: "autostart"; Description: "Start application automatically when Windows st
 
 [Files]
 ; Compiled launcher executable and Qt runtimes
-Source: "..\dist\GamingZoneShift\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\Equilibrium-Shift-Form\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Python application scripts and assets
 Source: "..\server.py"; DestDir: "{app}"; Flags: ignoreversion

@@ -1,6 +1,16 @@
 @echo off
 title Gaming Zone Shift Management
 cd /d "%~dp0"
+if exist "Equilibrium-Shift-Form.exe" (
+    start "" "Equilibrium-Shift-Form.exe"
+    exit /b 0
+)
+
+if exist "dist\Equilibrium-Shift-Form\Equilibrium-Shift-Form.exe" (
+    start "" "dist\Equilibrium-Shift-Form\Equilibrium-Shift-Form.exe"
+    exit /b 0
+)
+
 if exist "GamingZoneShift.exe" (
     start "" "GamingZoneShift.exe"
     exit /b 0

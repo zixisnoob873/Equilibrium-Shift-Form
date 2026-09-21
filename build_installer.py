@@ -49,17 +49,22 @@ def build():
     result = subprocess.run(cmd, cwd=INSTALLER_DIR)
 
     if result.returncode == 0:
-        installer_path = os.path.join(OUTPUT_DIR, "GamingZoneShiftSetup.exe")
-        root_copy = os.path.join(BASE_DIR, "GamingZoneShiftSetup.exe")
-        dist_copy = os.path.join(BASE_DIR, "dist", "GamingZoneShiftSetup.exe")
+        installer_path = os.path.join(OUTPUT_DIR, "Equilibrium-Shift-Form-Installer.exe")
+        root_copy = os.path.join(BASE_DIR, "Equilibrium-Shift-Form-Installer.exe")
+        root_typo_copy = os.path.join(BASE_DIR, "Equlibrium-Shift-Form-Installer.exe")
+        dist_copy = os.path.join(BASE_DIR, "dist", "Equilibrium-Shift-Form-Installer.exe")
+        dist_typo_copy = os.path.join(BASE_DIR, "dist", "Equlibrium-Shift-Form-Installer.exe")
         try:
             shutil.copy2(installer_path, root_copy)
+            shutil.copy2(installer_path, root_typo_copy)
             shutil.copy2(installer_path, dist_copy)
+            shutil.copy2(installer_path, dist_typo_copy)
         except Exception as e:
             print(f"[WARN] Failed to copy installer to root/dist: {e}")
 
         print(f"\n[SUCCESS] Windows Installer created successfully at:")
         print(f"  -> Project Root: {root_copy}")
+        print(f"  -> Project Root (alternate spelling): {root_typo_copy}")
         print(f"  -> Dist Folder:  {dist_copy}")
         print(f"  -> Output:       {installer_path}\n")
         return True

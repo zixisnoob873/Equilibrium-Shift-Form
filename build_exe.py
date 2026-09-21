@@ -34,7 +34,7 @@ def build():
         sys.executable, "-m", "PyInstaller",
         "--noconsole",
         "--onedir",
-        "--name=GamingZoneShift",
+        "--name=Equilibrium-Shift-Form",
         f"--icon={ICON_ICO}",
         "--clean",
         "-y",
@@ -44,7 +44,7 @@ def build():
     result = subprocess.run(cmd, cwd=BASE_DIR)
 
     if result.returncode == 0:
-        exe_path = os.path.join(BASE_DIR, "dist", "GamingZoneShift", "GamingZoneShift.exe")
+        exe_path = os.path.join(BASE_DIR, "dist", "Equilibrium-Shift-Form", "Equilibrium-Shift-Form.exe")
         print(f"\n[SUCCESS] Executable built successfully at:\n  -> {exe_path}\n")
         return True
     else:
