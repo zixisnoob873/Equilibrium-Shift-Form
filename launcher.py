@@ -1106,9 +1106,19 @@ class MainWindow(QMainWindow):
 # Main Entry Point
 # ---------------------------------------------------------------------------
 def main():
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            myappid = "Equilibrium.GamingZone.ShiftManager.2.0"
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except Exception:
+            pass
+
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(APP_VERSION)
+    if os.path.isfile(ICON_ICO):
+        app.setWindowIcon(QIcon(ICON_ICO))
     app.setStyleSheet(DARK_STYLE)
 
     window = MainWindow()

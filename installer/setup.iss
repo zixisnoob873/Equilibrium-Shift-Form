@@ -20,7 +20,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=output
 OutputBaseFilename=GamingZoneShiftSetup
-SetupIconFile=..\assets\icon.ico
+SetupIconFile=..\assets\installer_icon.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -69,7 +69,7 @@ Name: "{app}\screenshots"; Flags: uninsneveruninstall
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\icon.ico"
 Name: "{group}\Shift Form"; Filename: "http://localhost:5000"; IconFilename: "{app}\assets\icon.ico"
-Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
+Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"; IconFilename: "{app}\assets\installer_icon.ico"
 Name: "{autodesktop}\Shift Form"; Filename: "http://localhost:5000"; IconFilename: "{app}\assets\icon.ico"; Tasks: formdesktopicon
 Name: "{autodesktop}\Gaming Zone Shift Management"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\icon.ico"; Tasks: desktopicon
 
