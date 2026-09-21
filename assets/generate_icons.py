@@ -21,9 +21,12 @@ INSTALLER_ICO = os.path.join(ASSETS_DIR, "installer_icon.ico")
 ICON_SIZES = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
 
 
+APP_ICON_PNG = os.path.join(ASSETS_DIR, "app_icon.png")
+
+
 def generate_gold_icons(src_img: Image.Image):
-    print("[*] Generating primary gold application logo and icon...")
-    src_img.save(LOGO_PNG, format="PNG")
+    print("[*] Generating primary gold application icon...")
+    src_img.save(APP_ICON_PNG, format="PNG")
 
     # Generate multi-size ICO
     resized_images = [
@@ -36,7 +39,7 @@ def generate_gold_icons(src_img: Image.Image):
         sizes=ICON_SIZES,
         append_images=resized_images[:-1]
     )
-    print(f"  -> Saved {LOGO_PNG}")
+    print(f"  -> Saved {APP_ICON_PNG}")
     print(f"  -> Saved {ICON_ICO}")
 
 
