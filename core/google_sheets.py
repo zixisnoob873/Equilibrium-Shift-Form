@@ -64,6 +64,8 @@ class SheetConfig:
                 self.imgbb_key = f.read().strip()
 
     def is_configured(self):
+        if os.environ.get("DISABLE_SHEETS_SYNC") == "1":
+            return False
         return bool(self.sheet_id) and os.path.exists(self.credentials_path)
 
 

@@ -21,7 +21,7 @@ SHIFTS = {
 }
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LOCAL_DATA_DIR = os.path.join(BASE_DIR, "local_data")
+LOCAL_DATA_DIR = os.environ.get("LOCAL_DATA_DIR") or os.path.join(BASE_DIR, "local_data")
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 SCREENSHOTS_DIR = os.path.join(BASE_DIR, "screenshots")
 PANCAFE_SCREENSHOTS_DIR = os.path.join(SCREENSHOTS_DIR, "pancafe_screenshot")

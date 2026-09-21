@@ -4,11 +4,13 @@
 
 # --- Live Runtime Shift & Audit Data ---
 local_data/
+local_data_dev/
 uploads/
 screenshots/
 sync_errors.jsonl
 *.tmp
 *.log
+installer/output/
 
 # --- Sensitive API & Google Credentials ---
 credentials.json
@@ -32,6 +34,7 @@ env/
 build/
 dist/
 *.new.exe
+GamingZoneShiftSetup.exe
 
 # --- IDE & OS Files ---
 .vscode/
