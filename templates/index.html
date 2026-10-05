@@ -10,7 +10,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=30">
+    <link rel="stylesheet" href="/static/css/style.css?v=31">
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js"
         as="script">
     <script src="/static/js/chart.umd.min.js"></script>
@@ -1181,6 +1181,34 @@
         </div>
     </div>
 
+    <!-- Advisory Warning Modal: inventory closing stock not counted -->
+    <div class="modal-overlay" id="inventoryWarnModal">
+        <div class="modal inv-warn-modal">
+            <div class="modal-body inv-warn-body">
+                <div class="inv-warn-icon">⚠️</div>
+                <h2>Inventory Not Counted</h2>
+                <p id="invWarnMessage">All inventory items show 0 closing stock.</p>
+                <div class="inv-warn-stat">
+                    <div>
+                        <span class="ws-num" id="invWarnItemCount">0</span>
+                        <span class="ws-label">Items</span>
+                    </div>
+                    <div id="invWarnExpectedBlock">
+                        <span class="ws-num" id="invWarnExpected">0</span>
+                        <span class="ws-label">Expected On Hand</span>
+                    </div>
+                </div>
+                <p class="inv-warn-hint" id="invWarnHint">
+                    You can go back and enter the closing count, or close the shift anyway.
+                </p>
+            </div>
+            <div class="modal-footer inv-warn-footer">
+                <button class="btn btn-ghost" id="invWarnBackBtn">Go Back &amp; Count</button>
+                <button class="btn btn-primary" id="invWarnCloseAnywayBtn">Close Anyway</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Admin PIN Modal -->
     <div class="modal-overlay" id="adminPinModal">
         <div class="modal">
@@ -1340,7 +1368,7 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js"></script>
-    <script src="/static/js/app.js?v=61"></script>
+    <script src="/static/js/app.js?v=62"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {

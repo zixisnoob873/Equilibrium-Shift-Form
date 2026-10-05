@@ -2147,6 +2147,15 @@ async function closeShift() {
         return;
     }
 
+    // Advisory only: if every inventory item still shows 0 closing stock the
+    // count was probably skipped. Checked before the PIN so backing out costs
+    // nothing. Cancel returns to the form with all data intact.
+    const zeroClosing = getZeroClosingInventory();
+    if (zeroClosing) {
+        const proceedAnyway = await showInventoryWarnModal(zeroClosing);
+        if (!proceedAnyway) return;
+    }
+
     const pinOk = await requireEmployeePin(employee);
     if (!pinOk) return;
 
@@ -2397,6 +2406,71 @@ function showConfirmModal() {
 
         yesBtn.onclick = () => cleanup(true);
         noBtn.onclick = () => cleanup(false);
+    });
+}
+
+/* Advisory close-time check: warn when EVERY inventory item still reports 0
+   closing stock, which almost always means the count was skipped.
+
+   Returns {items, itemCount, expectedUnits} when the warning should be shown,
+   or null when there is nothing to warn about. Pure DOM reading - it does not
+   touch any money total, so the close path is unaffected.
+   No items configured -> null (an empty table is not a forgotten count).
+   A negative closing -> not "zero", so it suppresses the warning, because a
+   negative means somebody did type something. */
+function getZeroClosingInventory() {
+    const rows = Array.from(document.querySelectorAll('#inventoryBody tr'));
+    if (!rows.length) return null;
+    const items = [];
+    rows.forEach(r => {
+        const name = r.querySelector('.inv-opening')?.dataset?.item;
+        if (!name) return;
+        items.push({
+            name: name,
+            opening: parseInt(r.querySelector('.inv-opening')?.value) || 0,
+            restock: parseInt(r.querySelector('.inv-restock')?.value) || 0,
+            closing: parseInt(r.querySelector('.inv-closing')?.value) || 0
+        });
+    });
+    if (!items.length) return null;
+    if (!items.every(i => i.closing === 0)) return null;
+    return {
+        items: items,
+        itemCount: items.length,
+        expectedUnits: items.reduce((s, i) => s + i.opening + i.restock, 0)
+    };
+}
+
+function showInventoryWarnModal(info) {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('inventoryWarnModal');
+        const backBtn = document.getElementById('invWarnBackBtn');
+        const anywayBtn = document.getElementById('invWarnCloseAnywayBtn');
+        if (!overlay || !backBtn || !anywayBtn) { resolve(true); return; }
+
+        const count = info && info.itemCount ? info.itemCount : 0;
+        const expected = info && info.expectedUnits ? info.expectedUnits : 0;
+
+        document.getElementById('invWarnItemCount').textContent = String(count);
+        document.getElementById('invWarnExpected').textContent = String(expected);
+        // Only show the "expected on hand" figure when it is meaningful; a cafe
+        // that was empty all shift would otherwise read "0 expected".
+        document.getElementById('invWarnExpectedBlock').style.display = expected > 0 ? '' : 'none';
+        document.getElementById('invWarnMessage').textContent =
+            expected > 0
+                ? `All ${count} items still show 0 closing stock, but ${expected} units were expected on hand. Did you forget to count?`
+                : `All ${count} items still show 0 closing stock. Did you forget to count?`;
+
+        overlay.classList.add('show');
+
+        const cleanup = (result) => {
+            overlay.classList.remove('show');
+            backBtn.onclick = null;
+            anywayBtn.onclick = null;
+            resolve(result);
+        };
+        backBtn.onclick = () => cleanup(false);
+        anywayBtn.onclick = () => cleanup(true);
     });
 }
 

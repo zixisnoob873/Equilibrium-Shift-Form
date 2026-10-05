@@ -68,6 +68,18 @@
     --blue-a45:  rgba(var(--blue-rgb), 0.45);
     --blue-text: #60a5fa;
 
+    /* amber - advisory warnings that must not read as errors.
+       Already present in the palette via .cat-food, so reusing it keeps
+       the app to one hue per meaning. */
+    --warning:     #f59e0b;
+    --warning-bright: #fbbf24;
+    --warning-rgb: 245, 158, 11;
+    --warning-a08: rgba(var(--warning-rgb), 0.08);
+    --warning-a15: rgba(var(--warning-rgb), 0.15);
+    --warning-a30: rgba(var(--warning-rgb), 0.30);
+    --warning-a45: rgba(var(--warning-rgb), 0.45);
+    --warning-glow: 0 0 16px rgba(var(--warning-rgb), 0.18);
+
     /* green - available PC tile, "+ Add time" */
     --green-a05: rgba(var(--green-rgb), 0.05);
     --green-a08: rgba(var(--green-rgb), 0.08);
@@ -962,6 +974,37 @@ select.cd-hidden { display: none !important; }
 .confirm-body p { font-size:13px; color:var(--text-dim); margin-bottom:4px; line-height:1.6; }
 .confirm-highlight { font-size:15px; color:var(--gold); font-weight:600; }
 .confirm-footer { justify-content:center; gap:10px; }
+
+/* === ADVISORY WARNING MODAL (inventory not counted) ===
+   Amber, not red: this is a "please double-check" prompt, not an error, so
+   it must not read like the alarm modal. Layout mirrors .confirm-body so the
+   two dialogs feel like the same component. */
+.inv-warn-modal { border: 1px solid var(--warning-a30); box-shadow: var(--warning-glow); }
+.inv-warn-icon { font-size:40px; text-align:center; margin-bottom:12px; }
+.inv-warn-body { text-align:center; }
+.inv-warn-body h2 {
+    font-family:'Montserrat',sans-serif; font-size:18px; font-weight:700;
+    color: var(--warning); margin-bottom:8px; letter-spacing:0.5px;
+}
+.inv-warn-body p { font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:4px; }
+.inv-warn-stat {
+    display:flex; align-items:center; justify-content:center; gap:18px;
+    margin:14px 0 4px; padding:12px 8px;
+    background: var(--warning-a08);
+    border: 1px solid var(--warning-a30);
+    border-radius: var(--radius-sm);
+}
+.inv-warn-stat > div { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.inv-warn-stat .ws-num {
+    font-size:20px; font-weight:800; color: var(--warning-bright);
+    font-family:'Montserrat',monospace;
+}
+.inv-warn-stat .ws-label {
+    font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px;
+    color: var(--text-dim);
+}
+.inv-warn-hint { font-size:12px; color:var(--text-dim); margin-top:10px; font-style:italic; }
+.inv-warn-footer { justify-content:center; gap:10px; }
 
 /* === CLOSED SHIFT & AUDIT DETAILS === */
 .closed-view-card {
