@@ -174,29 +174,44 @@ class GoogleSheetsManager:
             or hand-edited layout) nothing is written at all — a drifted sheet
             must be fixed deliberately, never half-migrated.
         """
+        title = getattr(ws, "title", "?")
         try:
             live = ws.row_values(1)
         except Exception as e:
-            print(f"  Sheets: could not read headers of '{getattr(ws, 'title', '?')}': {e}")
+            print(f"  Sheets: could not read headers of '{title}': {e}")
             return False
         if not live:
             return False
         present = [h for h in live if h]
         if present != list(expected[:len(present)]):
-            print(f"  Sheets: '{getattr(ws, 'title', '?')}' header layout differs from the "
+            print(f"  Sheets: '{title}' header layout differs from the "
                   f"expected layout - leaving it untouched (no migration applied)")
             return False
         missing = list(expected[len(present):])
         if not missing:
             return False
         try:
+            # Widen the grid before writing the header cell. Unlike append_row(),
+            # cell() does NOT auto-grow the grid, so writing past the current
+            # column count fails with:
+            #   [400]: Range ('<sheet>'!AA1) exceeds grid limits.
+            # Guarded so it can only ever widen - never shrink, so no cell data
+            # can be lost. Widening is a no-op once the sheet is wide enough.
+            try:
+                current_cols = ws.col_count
+            except Exception:
+                current_cols = None
+            if current_cols is not None and current_cols < len(expected):
+                print(f"  Sheets: widening '{title}' from {current_cols} to "
+                      f"{len(expected)} columns to make room for {missing}")
+                ws.resize(rows=ws.row_count, cols=len(expected))
             for offset, name in enumerate(missing, start=len(present) + 1):
                 # (row, col) argument order — deliberately avoids A1 notation.
                 ws.cell(1, offset).value = name
         except Exception as e:
             print(f"  Sheets: failed to add header(s) {missing}: {e}")
             return False
-        print(f"  Sheets: added missing header(s) to '{getattr(ws, 'title', '?')}': {missing}")
+        print(f"  Sheets: added missing header(s) to '{title}': {missing}")
         return True
 
     def _upload_to_imgbb(self, filename: str, errors: Optional[list] = None) -> str:

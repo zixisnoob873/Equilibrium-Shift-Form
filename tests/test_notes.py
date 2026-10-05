@@ -147,18 +147,49 @@ check("N19 all-blank notes -> '-'",
 # 5. Header auto-migration safety
 # --------------------------------------------------------------------------
 class FakeWs:
-    """Minimal worksheet double that records cell writes."""
+    """Minimal worksheet double that records cell writes AND models the grid
+    limit, because that is the whole point: unlike append_row(), cell() does not
+    auto-grow the grid, so writing past col_count raises exactly like the real
+    Google Sheets API does."""
 
-    def __init__(self, header, fail=False):
+    def __init__(self, header, fail=False, fail_resize=False, cols=None, rows=1001):
         self.header = list(header)
         self.written = []
         self.title = "Shift Summary"
         self._fail = fail
+        self._fail_resize = fail_resize
+        self._col_count = cols if cols is not None else len(self.header)
+        self._row_count = rows
+        self.resizes = []
+
+    # --- grid properties (mirroring gspread's read-only properties) ---
+    @property
+    def col_count(self):
+        return self._col_count
+
+    @property
+    def row_count(self):
+        return self._row_count
+
+    def resize(self, rows=None, cols=None):
+        if self._fail_resize:
+            raise RuntimeError("cannot resize grid")
+        if rows is not None:
+            self._row_count = rows
+        if cols is not None:
+            self._col_count = cols
+        self.resizes.append((rows, cols))
+        return {}
 
     def row_values(self, n):
         return list(self.header)
 
     def cell(self, row, col):
+        if col > self._col_count:
+            raise RuntimeError(
+                "Range ('%s'!%s%d) exceeds grid limits. Max columns: %d"
+                % (self.title, chr(64 + col) if col <= 26 else 'A+', row, self._col_count)
+            )
         self.written.append((row, col))
         if self._fail:
             raise RuntimeError("quota exceeded")
@@ -201,6 +232,38 @@ check("N24 empty header row: no-op",
       mgr._topup_headers(FakeWs([]), SUMMARY_HEADERS) is False, "must be False")
 check("N25 API failure mid-write: caught, no crash",
       mgr._topup_headers(FakeWs(SUMMARY_HEADERS[:26], fail=True), SUMMARY_HEADERS) is False, "must be False")
+
+# 5b. Grid-limit regression. A 26-header row can sit on a grid that is only
+# 26 columns wide; cell() does NOT auto-grow (append_row does), so the header
+# write 400s with "Range ('Shift Summary'!AA1) exceeds grid limits" unless the
+# grid is widened first.
+ws_narrow = FakeWs(SUMMARY_HEADERS[:26])
+check("N52 narrow grid is detected before any cell write",
+      ws_narrow.col_count == 26 and len(SUMMARY_HEADERS) == 27, ws_narrow.col_count)
+check("N53 grid is widened to 27 before writing AA1",
+      mgr._topup_headers(ws_narrow, SUMMARY_HEADERS) is True
+      and ws_narrow.resizes == [(1001, 27)]
+      and ws_narrow.header[26] == "Note",
+      (ws_narrow.resizes, ws_narrow.header[26:]))
+check("N54 widening preserves row count and never shrinks columns",
+      ws_narrow.row_count == 1001 and ws_narrow.col_count == 27,
+      (ws_narrow.row_count, ws_narrow.col_count))
+ws_wide = FakeWs(SUMMARY_HEADERS[:26], cols=40)
+check("N55 sheet wider than expected: no resize call",
+      mgr._topup_headers(ws_wide, SUMMARY_HEADERS) is True and ws_wide.resizes == []
+      and ws_wide.header[26] == "Note", (ws_wide.resizes, ws_wide.header[26:]))
+tx = FakeWs(TRANSACTIONS_HEADERS[:13], cols=15, rows=1001)
+tx.title = TRANSACTIONS_SHEET_NAME
+check("N56 transactions sheet (15 wide, 14 expected): no resize",
+      mgr._topup_headers(tx, TRANSACTIONS_HEADERS) is True
+      and tx.resizes == [] and tx.header[13] == "Timestamp",
+      (tx.resizes, tx.header[13:]))
+ws_resize_fail = FakeWs(SUMMARY_HEADERS[:26], fail_resize=True)
+check("N57 resize failure: caught, returns False, no crash",
+      mgr._topup_headers(ws_resize_fail, SUMMARY_HEADERS) is False, "must be False")
+check("N58 after a successful widen, a repeat call is still a no-op",
+      mgr._topup_headers(ws_narrow, SUMMARY_HEADERS) is False
+      and ws_narrow.written == [(1, 27)], (ws_narrow.resizes, ws_narrow.written))
 
 
 # --------------------------------------------------------------------------

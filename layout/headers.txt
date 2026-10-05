@@ -103,3 +103,11 @@ NOTES
   or rewrites existing headers, and it writes NOTHING if the live headers
   are not an exact prefix of the expected layout - a drifted or hand-edited
   sheet must be fixed deliberately. Safe to run on every sync.
+- GRID WIDTH: _topup_headers() widens the grid with ws.resize() before writing
+  the new header. This is required because append_row()/append_rows() DO
+  auto-widen the grid ("widens the worksheet if there are more values than
+  columns") but cell().value does NOT - writing past the current column count
+  fails with [400]: Range ('Shift Summary'!AA1) exceeds grid limits. Max
+  columns: 26. The resize is guarded by col_count < len(expected), so it can
+  only ever widen (never shrink, so no cell data is lost) and it happens at
+  most once per sheet.
