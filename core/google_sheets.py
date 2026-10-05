@@ -4,7 +4,7 @@ import threading
 from typing import Optional, Callable
 from config import UPLOAD_DIR, BASE_URL
 from .local_cache import save_shift
-from .models import ShiftData, ExpenseEntry
+from .models import ShiftData, ExpenseEntry, normalize_notes
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CREDENTIALS_FILE = os.path.join(ROOT_DIR, "credentials.json")
@@ -29,7 +29,8 @@ SUMMARY_HEADERS = [
     "Total TAX Amount",
     "Morning Pkg Count", "Nighter Pkg Count", "PS5 Session Count",
     "Inventory", "Closed At",
-    "Pancafe Screenshot", "Form Screenshot"
+    "Pancafe Screenshot", "Form Screenshot",
+    "Note"
 ]
 
 TRANSACTIONS_HEADERS = [
@@ -143,7 +144,8 @@ class GoogleSheetsManager:
     def _ensure_sheets_exist(self, wb):
         import gspread.exceptions
         try:
-            wb.worksheet(SUMMARY_SHEET_NAME)
+            ws = wb.worksheet(SUMMARY_SHEET_NAME)
+            self._topup_headers(ws, SUMMARY_HEADERS)
         except gspread.exceptions.WorksheetNotFound:
             ws = wb.add_worksheet(title=SUMMARY_SHEET_NAME, rows=1000, cols=len(SUMMARY_HEADERS))
             ws.append_row(SUMMARY_HEADERS[:])
@@ -151,13 +153,51 @@ class GoogleSheetsManager:
             print(f"  Sheets API error checking summary sheet: {e}")
             raise
         try:
-            wb.worksheet(TRANSACTIONS_SHEET_NAME)
+            tx_ws = wb.worksheet(TRANSACTIONS_SHEET_NAME)
+            self._topup_headers(tx_ws, TRANSACTIONS_HEADERS)
         except gspread.exceptions.WorksheetNotFound:
             ws = wb.add_worksheet(title=TRANSACTIONS_SHEET_NAME, rows=1000, cols=len(TRANSACTIONS_HEADERS) + 1)
             ws.append_row(TRANSACTIONS_HEADERS[:])
         except gspread.exceptions.APIError as e:
             print(f"  Sheets API error checking transactions sheet: {e}")
             raise
+
+    def _topup_headers(self, ws, expected) -> bool:
+        """Idempotent schema migration: append any header missing from the END of
+        the sheet's own header row. Runs on every sync, so adding a column to
+        SUMMARY_HEADERS migrates live sheets automatically.
+
+        Two safety properties, both deliberate:
+          * Existing headers are never reordered, rewritten or removed. Rows are
+            written positionally, so a reorder would silently corrupt the sheet.
+          * If the live headers are not an exact prefix of `expected` (a legacy
+            or hand-edited layout) nothing is written at all — a drifted sheet
+            must be fixed deliberately, never half-migrated.
+        """
+        try:
+            live = ws.row_values(1)
+        except Exception as e:
+            print(f"  Sheets: could not read headers of '{getattr(ws, 'title', '?')}': {e}")
+            return False
+        if not live:
+            return False
+        present = [h for h in live if h]
+        if present != list(expected[:len(present)]):
+            print(f"  Sheets: '{getattr(ws, 'title', '?')}' header layout differs from the "
+                  f"expected layout - leaving it untouched (no migration applied)")
+            return False
+        missing = list(expected[len(present):])
+        if not missing:
+            return False
+        try:
+            for offset, name in enumerate(missing, start=len(present) + 1):
+                # (row, col) argument order — deliberately avoids A1 notation.
+                ws.cell(1, offset).value = name
+        except Exception as e:
+            print(f"  Sheets: failed to add header(s) {missing}: {e}")
+            return False
+        print(f"  Sheets: added missing header(s) to '{getattr(ws, 'title', '?')}': {missing}")
+        return True
 
     def _upload_to_imgbb(self, filename: str, errors: Optional[list] = None) -> str:
         """Upload a screenshot to ImgBB and return its URL. On any failure a
@@ -330,6 +370,20 @@ class GoogleSheetsManager:
         tot = float(shift.total_expenses or 0.0)
         return f"{int(tot)}" if tot == int(tot) else (f"{tot:.2f}" if tot > 0 else 0)
 
+    def _format_notes_for_sheet(self, shift: ShiftData):
+        """Renders the note list into a single Shift Summary cell.
+        No notes  -> "-"
+        One note  -> the text on its own
+        2+ notes  -> numbered, one per line ("1. ...\\n2. ...")
+        normalize_notes() guarantees only clean strings reach the sheet, so a
+        malformed stored value can never be written as a stringified object."""
+        valid = normalize_notes(shift.notes)
+        if not valid:
+            return "-"
+        if len(valid) == 1:
+            return valid[0]
+        return "\n".join(f"{i}. {text}" for i, text in enumerate(valid, 1))
+
     def _append_summary(self, wb, shift: ShiftData, ordered: bool = False):
         ws = wb.worksheet(SUMMARY_SHEET_NAME)
 
@@ -428,6 +482,7 @@ class GoogleSheetsManager:
                     inv_parts.append(f"{i.get('name', '')}: {i.get('closing_stock', 0)}")
             inv_str = ", ".join(inv_parts) if inv_parts else "None"
             exp_str = self._format_expenses_for_sheet(shift)
+            note_str = self._format_notes_for_sheet(shift)
 
             total_sale = shift.grand_total
             total_payment = shift.cash_received + shift.online_payments + shift.actual_pos_amount
@@ -450,7 +505,8 @@ class GoogleSheetsManager:
                 len(shift.ps5_sessions), inv_str,
                 shift.closed_at,
                 pancafe_url,
-                form_url
+                form_url,
+                note_str
             ]
             if insert_at is None:
                 ws.append_row(summary_row)

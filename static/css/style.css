@@ -593,6 +593,43 @@ select.cd-hidden { display: none !important; }
 .ps5-extended td:last-child {
     border-right: 2px solid rgba(59, 130, 246, 0.3);
 }
+
+/* ── Shift Notes (same blue highlight as PS5 extended sessions) ── */
+.note-row td {
+    background: rgba(59, 130, 246, 0.06) !important;
+    border-bottom: 1px solid rgba(59, 130, 246, 0.12) !important;
+}
+.note-row td:first-child {
+    border-left: 2px solid rgba(59, 130, 246, 0.3);
+}
+.note-row td:last-child {
+    border-right: 2px solid rgba(59, 130, 246, 0.3);
+}
+.note-inner { display: flex; align-items: center; gap: 8px; }
+.note-tag {
+    flex-shrink: 0;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+    color: #60a5fa; background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 4px; padding: 2px 6px;
+}
+.note-row .note-text {
+    flex: 1; min-width: 0;
+    padding: 5px 8px;
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text-bright);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-radius: 4px;
+    font-size: 12px; font-weight: 500;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.note-row .note-text:focus { border-color: rgba(59, 130, 246, 0.6); }
+.note-del { flex-shrink: 0; margin: 0; }
+/* Read-only notes panel on the closed-shift view */
+.note-detail-list { display: flex; flex-direction: column; gap: 6px; }
+.note-view-row { border-color: rgba(59, 130, 246, 0.25); background: rgba(59, 130, 246, 0.05); }
+.note-view-row .item-title { color: var(--text-bright); }
 .ext-badge {
     display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
     padding: 2px 8px; border-radius: 4px; color: #60a5fa; background: rgba(59,130,246,0.1);

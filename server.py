@@ -18,7 +18,7 @@ from flask_talisman import Talisman
 import threading
 from datetime import datetime, timedelta
 from config import APP_NAME, APP_VERSION, BASE_URL, EMPLOYEES as DEFAULT_EMPLOYEES, INVENTORY_ITEMS as DEFAULT_INVENTORY, PACKAGES as DEFAULT_PACKAGES, DEFAULT_PS5_PRICING, DEFAULT_TOTAL_PCS, LOCAL_DATA_DIR, UPLOAD_DIR, SCREENSHOTS_DIR, PANCAFE_SCREENSHOTS_DIR, FORM_SCREENSHOTS_DIR, SHIFTS, detect_shift, get_current_date, get_current_day
-from core.models import ShiftData, PackageEntry, PS5Session, InventoryItem, ExpenseEntry
+from core.models import ShiftData, PackageEntry, PS5Session, InventoryItem, ExpenseEntry, normalize_notes
 from core.shift_manager import ShiftManager
 from core.local_cache import save_shift, get_last_closed_shift, get_last_shift, get_last_active_shift, get_all_shifts, load_shift, log_shift_access, get_shift_access_logs, get_recent_closed_shift_ids
 from core.google_sheets import SUMMARY_SHEET_NAME, TRANSACTIONS_SHEET_NAME
@@ -179,6 +179,15 @@ def _lookup_package_by_amount(amount):
         if pkg.get("price") == amount:
             return pkg.get("hz", ""), pkg.get("hrs", "")
     return "", ""
+
+
+def _parse_notes(raw):
+    """Normalizes submitted shift notes into a list of non-empty strings.
+    Thin delegate to core.models.normalize_notes, which is the single canonical
+    normalizer (also used by ShiftData.from_dict and the sheet formatter), so
+    the request path, the stored record and the sheet can never disagree.
+    Notes carry no amount and are never folded into total_expenses/grand_total."""
+    return normalize_notes(raw)
 
 
 def get_effective_config():
@@ -386,6 +395,7 @@ def close_shift():
             ))
         for exp in shift_data.get("expenses", []):
             shift.expenses.append(ExpenseEntry(exp.get("description", ""), float(exp.get("amount", 0))))
+        shift.notes = _parse_notes(shift_data.get("notes"))
 
         # opened_at stays from the stored active shift (temporal identity is
         # never client-rewritable).
@@ -477,6 +487,7 @@ def auto_save_shift():
         shift.ps5_sessions = [PS5Session(ses.get("ps_number", ""), int(ses.get("controllers", 2)), ses.get("start_time", ""), ses.get("end_time", ""), float(ses.get("amount", 0)), int(ses.get("duration_hours", 1)), bool(ses.get("is_extended", False)), str(ses.get("row_id", "") or ""), bool(ses.get("amount_manual", False))) for ses in shift_data.get("ps5_sessions", [])]
         shift.inventory = [InventoryItem(inv.get("name", ""), int(inv.get("opening_stock", 0)), int(inv.get("restock_qty", 0)), int(inv.get("closing_stock", 0))) for inv in shift_data.get("inventory", [])]
         shift.expenses = [ExpenseEntry(exp.get("description", ""), float(exp.get("amount", 0))) for exp in shift_data.get("expenses", [])]
+        shift.notes = _parse_notes(shift_data.get("notes"))
         shift.inventory_items_snapshot = shift_data.get("inventory_items_snapshot", shift.inventory_items_snapshot)
         shift.form_screenshot_filename = shift_data.get("form_screenshot_filename", shift.form_screenshot_filename)
         shift.pancafe_screenshot_filename = shift_data.get("pancafe_screenshot_filename", shift.pancafe_screenshot_filename)
@@ -489,6 +500,7 @@ def auto_save_shift():
             shift_manager.current_shift.ps5_sessions = shift.ps5_sessions
             shift_manager.current_shift.inventory = shift.inventory
             shift_manager.current_shift.expenses = shift.expenses
+            shift_manager.current_shift.notes = shift.notes
             shift_manager.current_shift.inventory_items_snapshot = shift.inventory_items_snapshot
         return jsonify({"success": True})
     except Exception as e:

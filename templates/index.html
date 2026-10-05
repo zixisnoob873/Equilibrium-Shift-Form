@@ -10,7 +10,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=28">
+    <link rel="stylesheet" href="/static/css/style.css?v=29">
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js"
         as="script">
     <script src="/static/js/chart.umd.min.js"></script>
@@ -189,7 +189,11 @@
                         <section class="card">
                             <div class="card-header">
                                 <h2><span class="accent-gold">◈</span> Expenses & Refunds</h2>
-                                <button class="btn btn-sm btn-ghost" onclick="addExpenseRow()">+ Add</button>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-ghost" onclick="addExpenseRow()">+ Add Expense</button>
+                                    <button class="btn btn-sm ext-btn" onclick="addNoteRow('', true)"
+                                            title="Add a free-text shift note (no amount)">+ Add Note</button>
+                                </div>
                             </div>
                             <div class="table-wrap">
                                 <table class="data-table">
@@ -536,6 +540,18 @@
                             <span class="badge-sm" id="cExpenseCountBadge">0 items</span>
                         </div>
                         <div class="closed-panel-body" id="cExpensesList">None</div>
+                    </div>
+
+                    <!-- 4b. Shift Notes -->
+                    <div class="closed-panel">
+                        <div class="closed-panel-header">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="closed-panel-icon">📝</span>
+                                <h4>Shift Notes</h4>
+                            </div>
+                            <span class="badge-sm" id="cNoteCountBadge">0 notes</span>
+                        </div>
+                        <div class="closed-panel-body" id="cNotesList">None</div>
                     </div>
                 </div>
 
@@ -1324,7 +1340,7 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3/dist/dom-to-image-more.min.js"></script>
-    <script src="/static/js/app.js?v=60"></script>
+    <script src="/static/js/app.js?v=61"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {

@@ -1626,6 +1626,53 @@ function autoCalcExpenses() {
     recalcGrandTotal();
 }
 
+/* ── Shift Notes ──
+   A note is a free-text row in the same table as expenses, spanning all three
+   columns. It deliberately has NO .exp-desc and NO .exp-amount, so every
+   existing expense code path skips it automatically:
+     · autoCalcExpenses sums only .exp-amount  -> notes excluded
+     · buildShiftPayload's expense loop is guarded by `if (desc)` -> skipped
+     · recalcGrandTotal reads #summaryExpenses only -> money math untouched
+   Only collectNotes() reads them, and notes never reach total_expenses. */
+function addNoteRow(presetText, shouldFocus) {
+    const body = document.getElementById('expenseBody');
+    if (!body) return;
+    const row = document.createElement('tr');
+    row.className = 'note-row';
+    row.innerHTML = `
+        <td colspan="3">
+            <div class="note-inner">
+                <span class="note-tag">NOTE</span>
+                <input type="text" class="note-text" placeholder="e.g. Cash drawer was short at open"
+                       oninput="triggerAutoSave()" value="${escHtml(presetText || '')}">
+                <button class="btn-del-row note-del" title="Remove note"
+                        onclick="this.closest('tr').remove(); triggerAutoSave();">✕</button>
+            </div>
+        </td>`;
+    body.appendChild(row);
+    if (shouldFocus) {
+        const input = row.querySelector('.note-text');
+        if (input) input.focus();
+    }
+    triggerAutoSave();
+}
+
+function collectNotes() {
+    const body = document.getElementById('expenseBody');
+    if (!body) return [];
+    return Array.from(body.querySelectorAll('.note-text'))
+        .map(i => (i.value || '').trim())
+        .filter(t => t.length > 0);
+}
+
+/* Restore path. Array.isArray guards the form from a non-list `notes` value
+   (populateFormFromShift has no catch, so a throw here would abort the whole
+   restore). shouldFocus is false so restoring never steals the caret. */
+function renderNoteRows(notes) {
+    if (!Array.isArray(notes)) return;
+    notes.forEach(n => addNoteRow(typeof n === 'string' ? n : (n && n.text) || n || '', false));
+}
+
 function renderInventory(items) {
     const body = document.getElementById('inventoryBody');
     body.innerHTML = '';
@@ -1825,6 +1872,7 @@ function buildShiftPayload() {
             });
             return d;
         })(),
+        notes: collectNotes(),
         inventory_items_snapshot: (() => {
             const items = [];
             document.querySelectorAll('#inventoryBody tr .inv-opening').forEach(el => {
@@ -1857,6 +1905,8 @@ function payloadToStorageFormat(payload) {
     out.inventory = (payload.inventory || []).map(i => [i.name, i.opening_stock, i.restock_qty, i.closing_stock]);
     // expenses: [{description, amount}] -> [[description, amount]]
     out.expenses = (payload.expenses || []).map(e => [e.description, e.amount]);
+    // notes: [string] -> [string]  (already scalar; normalized defensively)
+    out.notes = (payload.notes || []).map(n => (Array.isArray(n) ? (n[0] || '') : (n && n.text) || n) || '');
     return out;
 }
 
@@ -2292,6 +2342,7 @@ function populateFormFromShift(s) {
             row.innerHTML = `<td><input type="text" class="exp-desc" value="${escHtml(e[0]||'')}" oninput="autoCalcExpenses()"></td><td><input type="number" class="exp-amount" value="${parseFloat(e[1]).toFixed(2)}" step="0.01" min="0" oninput="autoCalcExpenses()"></td><td><button class="btn-del-row" onclick="this.closest('tr').remove(); autoCalcExpenses();">✕</button></td>`;
             expenseBody.appendChild(row);
         });
+        renderNoteRows(s.notes);
         document.getElementById('topupInput').value = s.topup_sale || 0;
         document.getElementById('cafeteriaInput').value = s.cafeteria_sale || 0;
         document.getElementById('cashInput').value = s.cash_received || 0;
@@ -2550,6 +2601,25 @@ function renderClosedShiftView(s) {
                 <div class="detail-row-item">
                     <div class="item-title">🏷️ ${escHtml(String(expDesc))}</div>
                     <div class="item-amount" style="color:var(--danger);">PKR ${parseFloat(expAmt || 0).toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
+                </div>`;
+            }).join('') + `</div>`;
+        }
+    }
+
+    // 4b. Shift Notes (free-text; no amount, excluded from all money math)
+    const noteList = Array.isArray(s.notes) ? s.notes : [];
+    const noteBadge = document.getElementById('cNoteCountBadge');
+    if (noteBadge) noteBadge.textContent = `${noteList.length} note${noteList.length === 1 ? '' : 's'}`;
+    const noteListEl = document.getElementById('cNotesList');
+    if (noteListEl) {
+        if (!noteList.length) {
+            noteListEl.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No notes recorded.</div>';
+        } else {
+            noteListEl.innerHTML = `<div class="note-detail-list">` + noteList.map(n => {
+                const text = Array.isArray(n) ? (n[0] || '') : (n && n.text) || n || '';
+                if (!String(text).trim()) return '';
+                return `<div class="detail-row-item note-view-row">
+                    <div class="item-title">📝 ${escHtml(String(text))}</div>
                 </div>`;
             }).join('') + `</div>`;
         }

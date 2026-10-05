@@ -103,7 +103,7 @@ Create `imgbb_key.txt` in the project root with your ImgBB API key. Screenshot U
 - **Re-upload button (History)** — forces a brand-new ImgBB upload of that shift's screenshots and replaces the old sheet links; wrong-shift files are refused, and failures never overwrite working links
 
 ### Google Sheets Sync
-- Two sheets: **Shift Summary** (26 columns) and **Detailed Transactions** (14 columns)
+- Two sheets: **Shift Summary** (27 columns) and **Detailed Transactions** (14 columns)
 - Sync runs in a background thread on shift close — the close request never blocks
 - Dedup by shift_id (primary) or date+employee+total (fallback); transactions deduped by employee+timestamp, all under a lock so concurrent syncs can't double-append
 - Batch sync all unsynced shifts on server startup

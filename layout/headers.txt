@@ -5,7 +5,7 @@ constants). Single source of truth is core/google_sheets.py. Synced rows
 are appended positionally - order here MUST match the append code in
 _append_summary / _append_transactions.
 
-SHEET 1: "Shift Summary"  (26 columns, one row per shift)
+SHEET 1: "Shift Summary"  (27 columns, one row per shift)
 ----------------------------------------------------------
  1  Shift ID
  2  Date
@@ -33,6 +33,7 @@ SHEET 1: "Shift Summary"  (26 columns, one row per shift)
 24  Closed At
 25  Pancafe Screenshot
 26  Form Screenshot
+27  Note
 
 Row values appended (in order):
 shift_id, date, day, shift_timing, employee_name, topup_sale,
@@ -40,7 +41,14 @@ morning_pkg_total, nighter_pkg_total, ps5_total, cafeteria_sale,
 total_sale, online_payments, cash_received, actual_pos_amount,
 total_payment, exp_str, reconciliation, grand_total_net,
 total_tax_amount, len(morning_packages), len(nighter_packages),
-len(ps5_sessions), inv_str, closed_at, pancafe_url, form_url
+len(ps5_sessions), inv_str, closed_at, pancafe_url, form_url, note_str
+
+Column 27 "Note" is free text and carries NO amount:
+  0 notes -> "-"
+  1 note  -> the text on its own
+  2+      -> numbered, one per line ("1. ...\n2. ...")
+Notes never contribute to Total Expenses (16), Reconciliation (17) or
+Grand Total (18) - they are not expenses.
 
 SHEET 2: "Detailed Transactions"  (14 columns, one row per package / PS5 session)
 -------------------------------------------------------------------------------
@@ -89,3 +97,9 @@ NOTES
   (Date|Employee|Total) ONLY on legacy sheets without a "Shift ID" column;
   new-layout sheets always dedup by Shift ID (col A). Transaction dedup
   fallback indices Employee=3, Timestamp=13. Re-upload fallback cols 23/24.
+- SCHEMA MIGRATION: _ensure_sheets_exist() calls _topup_headers(), which
+  appends any header missing from the END of the sheet's own header row
+  (e.g. adding "Note" to a 26-column sheet). It never reorders
+  or rewrites existing headers, and it writes NOTHING if the live headers
+  are not an exact prefix of the expected layout - a drifted or hand-edited
+  sheet must be fixed deliberately. Safe to run on every sync.

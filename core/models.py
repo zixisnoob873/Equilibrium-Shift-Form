@@ -18,6 +18,45 @@ def _i(v, default=0):
         return default
 
 
+def normalize_notes(raw) -> List[str]:
+    """Coerce any submitted or stored `notes` value into a list of non-empty
+    strings. Accepts a list, a bare string, or a {"text": ...} object, and each
+    entry may be a string, a [text] pair, or a dict.
+
+    Anything unrecognised is ignored rather than raising: a malformed notes
+    field must never be able to fail a whole shift save, and must never end up
+    written to the Google Sheet as a stringified object.
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, (str, bytes, dict)):
+        raw = [raw]
+    elif not isinstance(raw, (list, tuple)):
+        return []
+    out = []
+    for n in raw:
+        if isinstance(n, dict):
+            n = n.get("text", "")
+        elif isinstance(n, (list, tuple)):
+            n = n[0] if len(n) > 0 else ""
+        if n is None or isinstance(n, bool):
+            continue
+        if isinstance(n, bytes):
+            try:
+                n = n.decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+        if not isinstance(n, str):
+            if isinstance(n, (int, float)):
+                n = str(n)
+            else:
+                continue
+        text = n.strip()
+        if text:
+            out.append(text)
+    return out
+
+
 @dataclass
 class PackageEntry:
     pc_name: str = ""
@@ -81,6 +120,10 @@ class ShiftData:
     ps5_sessions: List[PS5Session] = field(default_factory=list)
     inventory: List[InventoryItem] = field(default_factory=list)
     expenses: List[ExpenseEntry] = field(default_factory=list)
+    # Free-text shift notes, written in the form's Expenses & Refunds section.
+    # Deliberately NOT an ExpenseEntry: notes carry no amount and must never
+    # reach total_expenses, grand_total or the analytics aggregators.
+    notes: List[str] = field(default_factory=list)
     morning_pkg_total: float = 0.0
     nighter_pkg_total: float = 0.0
     ps5_total: float = 0.0
@@ -116,6 +159,7 @@ class ShiftData:
             "ps5_sessions": [s.to_list() for s in self.ps5_sessions],
             "inventory": [i.to_list() for i in self.inventory],
             "expenses": [[e.description, e.amount] for e in self.expenses],
+            "notes": [str(n) for n in self.notes],
             "morning_pkg_total": self.morning_pkg_total,
             "nighter_pkg_total": self.nighter_pkg_total,
             "ps5_total": self.ps5_total,
@@ -206,6 +250,9 @@ class ShiftData:
         for e in data.get("expenses", []) or []:
             if isinstance(e, (list, tuple)) and len(e) > 0:
                 obj.expenses.append(ExpenseEntry(str(e[0]) if e[0] is not None else "", _f(e[1]) if len(e) > 1 else 0.0))
+        # Notes are stored as plain strings, but accept ["text"], "text" and
+        # {"text": "..."} so a future schema change needs no migration.
+        obj.notes = normalize_notes(data.get("notes", []))
         obj.morning_pkg_total = _f(data.get("morning_pkg_total", 0))
         obj.nighter_pkg_total = _f(data.get("nighter_pkg_total", 0))
         obj.ps5_total = _f(data.get("ps5_total", 0))
